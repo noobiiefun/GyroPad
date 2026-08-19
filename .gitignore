@@ -1,0 +1,23 @@
+# Android / Gradle
+android/.gradle/
+android/local.properties
+android/.idea/
+android/**/build/
+android/captures/
+android/.cxx/
+android/*.apk
+android/*.aab
+*.iml
+
+# Gradle wrapper binary (dibuat ulang otomatis oleh Android Studio saat sync)
+android/gradle/wrapper/gradle-wrapper.jar
+
+# Python
+pc/__pycache__/
+pc/*.pyc
+pc/.venv/
+pc/venv/
+
+# OS
+.DS_Store
+Thumbs.db

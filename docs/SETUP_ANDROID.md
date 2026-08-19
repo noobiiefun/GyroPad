@@ -1,0 +1,80 @@
+# Setup Android App
+
+Panduan ini dites dengan **Xiaomi Redmi A3** + **iPega 9076**, tapi harusnya
+berlaku untuk HP Android lain (min. Android 7.0 / API 24) dan gamepad
+Bluetooth HID standar lainnya.
+
+## Prasyarat
+
+- [Android Studio](https://developer.android.com/studio) (versi terbaru
+  disarankan — project ini pakai Android Gradle Plugin 8.5.x & Kotlin 1.9.x)
+- HP Android dengan:
+  - Bluetooth (untuk pairing gamepad)
+  - WiFi (untuk kirim data ke PC)
+  - Sensor gyroscope (cek di `Settings > About phone` atau app seperti
+    "Sensor Box"; hampir semua HP modern termasuk Redmi A3 punya ini,
+    tapi HP entry-level tertentu kadang tidak menyertakannya)
+
+## Build & pasang
+
+1. Buka folder `android/` di Android Studio (**Open** → pilih folder
+   `android/`, bukan folder root repo).
+2. Tunggu Gradle sync selesai. Kalau ini pertama kali membuka project ini,
+   Android Studio akan otomatis membuatkan `gradle wrapper` yang belum
+   disertakan di repo (supaya repo tidak berat oleh binary wrapper).
+3. Colokkan HP lewat USB dengan **USB debugging** aktif
+   (`Settings > About phone` → tap `MIUI version`/`Build number` 7x untuk
+   memunculkan Developer options → aktifkan USB debugging), atau pakai
+   emulator (emulator tidak akan punya gyro/gamepad fisik, jadi disarankan
+   pakai device fisik).
+4. Tekan **Run ▶** di Android Studio, pilih device kamu.
+5. App **GyroPad** akan terpasang & terbuka otomatis.
+
+## Pairing gamepad iPega 9076
+
+1. Nyalakan iPega 9076, tekan tombol pairing (biasanya kombinasi
+   `HOME + START` atau tombol dedicated, cek manual bawaan gamepad kamu).
+2. Di HP: `Settings > Bluetooth`, cari & pasangkan dengan iPega.
+3. Setelah terpasang, buka app GyroPad — kamu tidak perlu memilih device
+   apapun di dalam app; Android otomatis meneruskan input gamepad yang
+   sudah paired sebagai input generik (sama seperti keyboard/mouse
+   Bluetooth), dan `MainActivity` sudah didesain untuk menangkapnya.
+4. Cek dengan menggerakkan stick — kalau semua bekerja dengan benar, nanti
+   setelah terhubung ke server (lihat bawah) kamu akan lihat counter
+   "Paket terkirim" naik terus.
+
+## Menghubungkan ke PC
+
+1. Pastikan PC sudah menjalankan `server.py` (lihat
+   [SETUP_PC.md](SETUP_PC.md)) dan **HP + PC berada di jaringan WiFi yang
+   sama** (mis. sama-sama connect ke router rumah, atau HP connect ke
+   hotspot PC).
+2. Cari tahu IP lokal PC kamu:
+   - Windows: buka Command Prompt, jalankan `ipconfig`, catat `IPv4
+     Address` di adapter WiFi/Ethernet yang aktif.
+3. Di app GyroPad, isi field **IP PC** dengan IP tadi (mis. `192.168.1.42`)
+   dan **Port** dengan `25565` (default, samakan dengan yang dipakai
+   `server.py`).
+4. Tekan **Hubungkan ke PC**. Kalau berhasil, status akan berubah jadi
+   "Mengirim ke ...", dan di terminal `server.py` akan muncul log
+   `Terhubung dengan <ip HP>`.
+
+## Menggunakan gyro-aim
+
+- Nyalakan toggle **Aktifkan Gyro** di app.
+- Atur **Sensitivitas Gyro** sesuai selera (mulai dari nilai default dulu,
+  baru disesuaikan).
+- Saat main, **tahan tombol L1** di gamepad fisik untuk mengaktifkan
+  gyro-aim sementara (mirip gaya "hold to aim" di Switch/DS4) — gerakkan
+  HP untuk menggeser arah bidik, lepas L1 untuk berhenti.
+- Tombol besar **"TAHAN untuk GYRO AIM"** di layar app hanya untuk testing
+  cepat tanpa perlu gamepad terpasang.
+
+## Troubleshooting
+
+| Masalah | Kemungkinan penyebab |
+|---|---|
+| Stick/tombol tidak terdeteksi sama sekali | Gamepad belum ter-pairing dengan benar, atau bukan gamepad HID standar (cek di `Settings > Bluetooth`, statusnya harus "Connected", bukan cuma "Paired") |
+| "Sensor gyroscope tidak tersedia di device ini" | HP kamu memang tidak punya chip gyroscope fisik — fitur gyro tidak bisa dipakai, tapi gamepad tetap berfungsi normal |
+| Status tidak berubah dari "Belum terhubung" / packet count tidak naik | Cek lagi IP PC, pastikan satu jaringan WiFi, cek firewall Windows tidak memblokir port UDP yang dipakai |
+| Gyro terasa terlalu sensitif/lambat | Atur slider **Sensitivitas Gyro** di app, atau argumen `--gyro-scale` di `server.py` |

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="GyroPad"
+        android:textSize="28sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="Gyro aiming untuk gamepad Bluetooth tanpa gyro"
+        android:textSize="14sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="IP PC (server)" />
+
+    <EditText
+        android:id="@+id/editTextIp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="192.168.1.100"
+        android:inputType="text" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Port" />
+
+    <EditText
+        android:id="@+id/editTextPort"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="25565"
+        android:inputType="number" />
+
+    <Button
+        android:id="@+id/buttonConnect"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Hubungkan ke PC" />
+
+    <TextView
+        android:id="@+id/textStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Belum terhubung" />
+
+    <TextView
+        android:id="@+id/textPacketCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Paket terkirim: 0" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="#33000000" />
+
+    <Switch
+        android:id="@+id/switchGyro"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Aktifkan Gyro" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Sensitivitas Gyro" />
+
+    <SeekBar
+        android:id="@+id/seekBarSensitivity"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="35" />
+
+    <Button
+        android:id="@+id/buttonGyroHold"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_marginTop="16dp"
+        android:text="TAHAN untuk GYRO AIM (tes tanpa L1)" />
+
+</LinearLayout>

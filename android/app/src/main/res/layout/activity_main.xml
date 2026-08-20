@@ -133,6 +133,29 @@
         android:max="100"
         android:progress="35" />
 
+    <TextView
+        android:id="@+id/textCalibrationStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Kalibrasi belum dijalankan"
+        android:textSize="13sp" />
+
+    <Button
+        android:id="@+id/buttonRecalibrate"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Kalibrasi Ulang (letakkan HP diam)" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Drift kecil selama main juga dikoreksi otomatis saat HP diam &amp; gyro-aim tidak sedang ditahan."
+        android:textSize="11sp"
+        android:textStyle="italic" />
+
     <Button
         android:id="@+id/buttonGyroHold"
         android:layout_width="match_parent"

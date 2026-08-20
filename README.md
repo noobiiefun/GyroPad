@@ -79,8 +79,8 @@ gyropad/
 ## Fitur
 
 - Baca stick/trigger/tombol dari gamepad Bluetooth HID fisik (dites iPega 9076)
-- Gyro-aim pakai sensor gyroscope HP, hold-to-aim lewat tombol L1
-- Dua mode koneksi ke PC: **WiFi (UDP)** atau **USB via ADB (TCP)**
+- Gyro-aim pakai sensor gyroscope HP, hold-to-aim lewat tombol L1, dengan kalibrasi bias otomatis + auto-koreksi drift saat HP diam
+- Dua mode koneksi ke PC: **WiFi (UDP)** atau **USB via ADB (TCP)**, protokol biner (bukan JSON) buat latency rendah
 - **Rumble feedback dari game ke HP** — pengganti motor getar gamepad yang rusak/tidak ada
 - Crosshair kalibrasi di dalam app buat merasakan sensitivitas gyro sebelum masuk game
 
@@ -110,7 +110,7 @@ maupun tool bawaan Windows) ada di [docs/TESTING.md](docs/TESTING.md).
 
 Rencana singkat:
 - [x] Ganti JSON dengan format biner supaya latency lebih rendah — **selesai di v0.3**
-- [ ] Kalibrasi & auto-recenter gyro yang lebih canggih (mis. deteksi diam)
+- [x] Kalibrasi & auto-recenter gyro yang lebih canggih (mis. deteksi diam) — **selesai di v0.4**
 - [ ] Dukungan Linux (uinput) selain ViGEmBus/Windows
 
 Rencana yang lebih besar (server sebagai driver ringan/tray app, notifikasi

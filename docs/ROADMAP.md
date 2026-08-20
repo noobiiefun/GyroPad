@@ -129,7 +129,7 @@ sungguhan lewat scope) daripada fitur yang terhubung ke logika game.
 ## Sudah lebih dulu ada di roadmap (dari versi sebelumnya)
 
 - [x] Ganti JSON dengan format biner supaya latency lebih rendah — **selesai di v0.3**, lihat [PROTOCOL.md](PROTOCOL.md)
-- [ ] Kalibrasi & auto-recenter gyro yang lebih canggih (mis. deteksi diam)
+- [x] Kalibrasi & auto-recenter gyro yang lebih canggih (mis. deteksi diam) — **selesai di v0.4**, lihat bagian "Kalibrasi bias & auto-koreksi drift" di [ARCHITECTURE.md](ARCHITECTURE.md)
 - [ ] UI mapping tombol yang bisa dikustomisasi
 - [ ] Simpan profil sensitivitas per-game
 - [ ] Dukungan Linux (uinput) selain ViGEmBus/Windows

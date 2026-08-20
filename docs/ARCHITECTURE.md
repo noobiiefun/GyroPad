@@ -48,6 +48,41 @@ terhadap gerakan tangan — mirip mouse. Maka yang dipakai adalah
 lalu direset setiap kali paket terkirim. Ini menghindari masalah drift
 orientasi absolut dan gimbal lock.
 
+### Kalibrasi bias & auto-koreksi drift (sejak v0.4)
+
+Memakai `TYPE_GYROSCOPE` mentah punya konsekuensi: setiap chip gyroscope
+punya sedikit **bias/offset bawaan** — nilai yang tetap terbaca sensor
+walau HP benar-benar diam. Kalau tidak dikoreksi, bias ini terintegrasi
+terus-menerus jadi delta yang membuat aim/crosshair "melayang" pelan ke
+satu arah walau tangan diam sempurna. `GyroManager` menangani ini lewat
+tiga lapis, berurutan dari yang paling terasa dampaknya:
+
+1. **Kalibrasi awal** (`startCalibration()`) — dipanggil otomatis sekali
+   saat `GyroManager.start()` (app baru dibuka), dan bisa dipanggil ulang
+   manual lewat tombol "Kalibrasi Ulang" di UI. Selama ~1.5 detik,
+   pembacaan sensor mentah dirata-ratakan (asumsi HP diam), hasilnya
+   disimpan sebagai `biasYaw`/`biasPitch` dan dikurangkan dari SETIAP
+   pembacaan sensor berikutnya, sebelum dipakai untuk apapun.
+2. **Auto-koreksi drift berkelanjutan** (`updateStillnessTracking()`) —
+   bias hasil kalibrasi awal bisa sedikit melayang lagi seiring waktu
+   (mis. karena suhu chip berubah selama HP dipakai lama). Daripada
+   menunggu user sadar ada drift lalu kalibrasi ulang manual, GyroManager
+   terus memantau: kalau magnitude gerakan di bawah `stillnessThreshold`
+   selama `stillnessRequiredSeconds` BERTURUT-TURUT, DAN `state.gyroActive`
+   sedang false (supaya tidak salah mengoreksi saat user sengaja menahan
+   bidikan diam-diam saat aiming), sisa bacaan sensor pelan-pelan diserap
+   ke bias lewat low-pass filter (`driftCorrectionAlpha` kecil, supaya
+   koreksinya halus dan tidak terasa sebagai "sentakan").
+3. **Deadzone noise** (`noiseDeadzoneRadPerSec`) — setelah bias
+   dikurangkan, noise sensor yang sangat kecil (jauh di bawah bias itu
+   sendiri) masih bisa lolos dan bikin crosshair "gemetar" halus. Magnitude
+   di bawah ambang ini diabaikan total (tidak diakumulasi jadi delta sama
+   sekali), berbeda dari koreksi bias yang menggeser baseline.
+
+Ketiganya independen dari format paket jaringan — murni logika lokal di
+`GyroManager`, jadi tidak mengubah `PROTOCOL.md` sama sekali (server tidak
+tahu dan tidak perlu tahu bahwa kalibrasi ini terjadi).
+
 ### Kenapa UDP, bukan lewat kabel USB/ADB?
 Versi awal ini pilih WiFi (UDP) karena paling simpel untuk prototyping:
 tidak perlu setup `adb forward`, device authorization, dsb — cukup satu

@@ -72,6 +72,25 @@ di [SETUP_ADB.md](SETUP_ADB.md). Setelah `server.py --mode tcp` jalan dan
 otomatis disembunyikan karena selalu `127.0.0.1`), isi Port yang sama, lalu
 **Hubungkan ke PC**.
 
+## Kalibrasi gyro
+
+Setiap kali app dibuka, GyroPad otomatis mengkalibrasi gyro selama ~1.5
+detik — **letakkan HP di meja/permukaan datar (jangan dipegang) selama
+proses ini**, supaya bias sensor terukur akurat. Status prosesnya terlihat
+di teks di bawah slider Sensitivitas ("Mengkalibrasi..." → "Kalibrasi
+selesai, siap dipakai").
+
+Kalau selama main kamu merasa aim/crosshair pelan-pelan "melayang" ke satu
+arah walau HP dipegang diam (drift), ada dua kemungkinan penyebab & solusi:
+
+- **Drift kecil, muncul bertahap** — biasanya sudah otomatis terkoreksi
+  sendiri; GyroPad terus memantau saat HP diam & gyro-aim tidak sedang
+  ditahan, lalu pelan-pelan mengoreksi bias tanpa perlu tindakan apapun
+  darimu.
+- **Drift terasa besar/tiba-tiba** (mis. habis HP kepanasan, atau abis
+  dipakai keras) — tekan tombol **"Kalibrasi Ulang (letakkan HP diam)"**,
+  taruh HP diam sebentar sampai status berubah jadi "Kalibrasi selesai".
+
 ## Menggunakan gyro-aim
 
 - Nyalakan toggle **Aktifkan Gyro** di app.
@@ -106,3 +125,5 @@ otomatis disembunyikan karena selalu `127.0.0.1`), isi Port yang sama, lalu
 | Gyro terasa terlalu sensitif/lambat | Atur slider **Sensitivitas Gyro** di app, atau argumen `--gyro-scale` di `server.py` |
 | Mode USB stuck di "Menyambung ke PC lewat USB..." | Lihat troubleshooting khusus di [SETUP_ADB.md](SETUP_ADB.md) |
 | HP tidak bergetar sama sekali walau ada rumble di game | Cek izin VIBRATE tidak diblokir di pengaturan aplikasi (`Settings > Apps > GyroPad > Permissions`), dan cek game memang mengirim rumble ke controller Xbox |
+| Crosshair/aim melayang ke satu arah walau HP diam | Tekan **"Kalibrasi Ulang"**, letakkan HP diam sampai status "Kalibrasi selesai" muncul — jangan gerakkan HP selama proses (~1.5 detik) |
+| Kalibrasi terasa tidak akurat / masih drift setelah kalibrasi ulang | Kemungkinan HP masih sedikit bergerak/tergoyang selama proses ~1.5 detik kalibrasi — ulangi dengan HP benar-benar diam di permukaan datar (bukan dipegang tangan) |

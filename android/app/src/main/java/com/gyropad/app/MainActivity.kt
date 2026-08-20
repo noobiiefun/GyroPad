@@ -77,6 +77,8 @@ class MainActivity : AppCompatActivity() {
         val gyroSwitch = findViewById<Switch>(R.id.switchGyro)
         val sensitivitySeek = findViewById<SeekBar>(R.id.seekBarSensitivity)
         val gyroHoldButton = findViewById<Button>(R.id.buttonGyroHold)
+        val recalibrateButton = findViewById<Button>(R.id.buttonRecalibrate)
+        val calibrationStatusText = findViewById<TextView>(R.id.textCalibrationStatus)
         statusText = findViewById(R.id.textStatus)
         packetCountText = findViewById(R.id.textPacketCount)
         rumbleStatusText = findViewById(R.id.textRumbleStatus)
@@ -141,6 +143,17 @@ class MainActivity : AppCompatActivity() {
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> gyroManager.setActive(false)
             }
             false
+        }
+
+        recalibrateButton.setOnClickListener {
+            gyroManager.startCalibration()
+        }
+
+        // Callback status HARUS dipasang sebelum gyroManager.start() dipanggil
+        // di bawah, karena start() langsung memicu kalibrasi awal - kalau
+        // dipasang setelahnya, pesan status pertama akan terlewat.
+        gyroManager.onCalibrationStatusChanged = { msg ->
+            runOnUiThread { calibrationStatusText.text = msg }
         }
 
         gyroManager.onVisualOffsetChanged = { x, y ->

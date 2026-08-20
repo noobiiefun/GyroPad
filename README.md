@@ -83,6 +83,7 @@ gyropad/
 - Dua mode koneksi ke PC: **WiFi (UDP)** atau **USB via ADB (TCP)**, protokol biner (bukan JSON) buat latency rendah
 - **Rumble feedback dari game ke HP** — pengganti motor getar gamepad yang rusak/tidak ada
 - Crosshair kalibrasi di dalam app buat merasakan sensitivitas gyro sebelum masuk game
+- Profil sensitivitas per-game (buat, pilih, hapus lewat dropdown + tombol "+"), tersimpan lokal di HP
 
 ## Quick start
 

@@ -201,6 +201,44 @@ punya akses untuk menggambar di atas tampilan PC; kalau suatu saat ingin
 HUD sungguhan di layar PC, itu perlu komponen terpisah (mis. overlay window
 always-on-top di sisi PC) yang saat ini belum ada di repo ini.
 
+## Profil sensitivitas per-game (sejak v0.5)
+
+Sensitivitas gyro yang pas buat satu game belum tentu pas buat game lain
+(mis. game dengan FOV sempit/zoom sniper biasanya butuh sensitivitas lebih
+rendah dibanding game FOV lebar). Daripada user harus geser-geser slider
+manual tiap ganti game, `ProfileStore` menyimpan beberapa preset bernama
+secara lokal di HP.
+
+**Desain penyimpanan:** satu `SharedPreferences` file (`gyropad_profiles`),
+isinya satu JSON array berisi semua profil (`{"name": ..., "sensitivity":
+...}`), plus satu key terpisah buat mengingat nama profil yang terakhir
+aktif. Dipilih JSON array tunggal (bukan satu key per profil) karena
+jumlah profil realistis cuma belasan/puluhan — cukup ringan buat di-load
+dan disimpan utuh sekaligus tiap ada perubahan, tanpa perlu database
+seperti Room.
+
+**Alur pemakaian:**
+1. Saat app dibuka, `ProfileStore.loadProfiles()` — kalau belum pernah ada
+   profil tersimpan (instalasi baru), otomatis dibuatkan satu profil
+   `"Default"`.
+2. Dropdown profil menampilkan semua nama profil; pindah profil langsung
+   menerapkan nilai sensitivitasnya ke `GyroManager` DAN slider (lewat
+   `applyProfile()`).
+3. Kalau user menggeser slider secara manual SAAT sebuah profil aktif,
+   nilai barunya langsung disimpan balik ke profil itu (lewat
+   `updateActiveProfileSensitivity()`) — tidak perlu tombol "simpan"
+   terpisah, tweak halus di tengah main otomatis persisten.
+4. Tombol **"+"** membuka dialog nama, membuat profil baru dari nilai
+   slider SAAT INI (bukan dari default), langsung jadi aktif.
+5. Tombol **"Hapus"** menghapus profil yang lagi aktif (dengan konfirmasi),
+   minimal selalu ada satu profil tersisa.
+
+Field `suppressSpinnerCallback` di `MainActivity` sengaja ada untuk
+mencegah loop tak diinginkan: setiap kali kode MEMANGGIL
+`spinnerProfile.setSelection(...)` secara terprogram (bukan user yang
+tap dropdown), listener pemilihan profil butuh tahu supaya tidak
+memproses ulang seolah-olah user memilih profil lain.
+
 ## Kenapa mengirim snapshot berkala, bukan setiap event?
 
 Event stick/gyro bisa datang puluhan-ratusan kali per detik. Kalau tiap

@@ -131,7 +131,7 @@ sungguhan lewat scope) daripada fitur yang terhubung ke logika game.
 - [x] Ganti JSON dengan format biner supaya latency lebih rendah — **selesai di v0.3**, lihat [PROTOCOL.md](PROTOCOL.md)
 - [x] Kalibrasi & auto-recenter gyro yang lebih canggih (mis. deteksi diam) — **selesai di v0.4**, lihat bagian "Kalibrasi bias & auto-koreksi drift" di [ARCHITECTURE.md](ARCHITECTURE.md)
 - [ ] UI mapping tombol yang bisa dikustomisasi
-- [ ] Simpan profil sensitivitas per-game
+- [x] Simpan profil sensitivitas per-game — **selesai di v0.5**, lihat bagian "Profil sensitivitas per-game" di [ARCHITECTURE.md](ARCHITECTURE.md)
 - [ ] Dukungan Linux (uinput) selain ViGEmBus/Windows
 - [ ] Overlay HUD sungguhan di layar PC (bukan cuma preview di app HP)
 

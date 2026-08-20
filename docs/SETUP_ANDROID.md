@@ -102,6 +102,29 @@ arah walau HP dipegang diam (drift), ada dua kemungkinan penyebab & solusi:
 - Tombol besar **"TAHAN untuk GYRO AIM"** di layar app hanya untuk testing
   cepat tanpa perlu gamepad terpasang.
 
+## Profil sensitivitas per-game
+
+Sensitivitas yang enak di satu game belum tentu enak di game lain — GyroPad
+bisa menyimpan beberapa preset sensitivitas bernama, tersimpan lokal di HP
+(tidak perlu internet/akun).
+
+- **Pindah profil**: pilih dari dropdown **"Profil Sensitivitas"** di atas
+  slider — begitu dipilih, slider & sensitivitas gyro langsung mengikuti
+  nilai profil itu.
+- **Buat profil baru**: atur dulu slider sensitivitas sesuai keinginan
+  (mis. sambil coba-coba di panel crosshair), lalu tekan tombol **"+"**,
+  beri nama (mis. nama game-nya), tekan **Simpan**. Nilai slider SAAT ITU
+  yang tersimpan sebagai profil baru.
+- **Edit profil**: tidak ada tombol edit terpisah — cukup pilih profilnya
+  dari dropdown, lalu geser slider seperti biasa. Perubahan otomatis
+  tersimpan balik ke profil yang sedang aktif, tanpa perlu langkah simpan
+  tambahan.
+- **Hapus profil**: pilih profil yang mau dihapus dari dropdown, tekan
+  **"Hapus"**, konfirmasi. Minimal harus selalu ada satu profil tersisa
+  (tidak bisa menghapus profil terakhir).
+- Profil yang terakhir aktif akan otomatis dipilih lagi saat app dibuka
+  ulang.
+
 ## Crosshair kalibrasi & rumble
 
 - Panel **"Preview arah gyro"** di bawah tombol gyro-aim menampilkan
@@ -127,3 +150,5 @@ arah walau HP dipegang diam (drift), ada dua kemungkinan penyebab & solusi:
 | HP tidak bergetar sama sekali walau ada rumble di game | Cek izin VIBRATE tidak diblokir di pengaturan aplikasi (`Settings > Apps > GyroPad > Permissions`), dan cek game memang mengirim rumble ke controller Xbox |
 | Crosshair/aim melayang ke satu arah walau HP diam | Tekan **"Kalibrasi Ulang"**, letakkan HP diam sampai status "Kalibrasi selesai" muncul — jangan gerakkan HP selama proses (~1.5 detik) |
 | Kalibrasi terasa tidak akurat / masih drift setelah kalibrasi ulang | Kemungkinan HP masih sedikit bergerak/tergoyang selama proses ~1.5 detik kalibrasi — ulangi dengan HP benar-benar diam di permukaan datar (bukan dipegang tangan) |
+| Sensitivitas balik ke nilai lama setelah pindah profil lalu balik lagi | Ini perilaku normal — tiap profil menyimpan nilainya sendiri-sendiri, geser slider saat profil itu aktif kalau memang mau diubah |
+| Tombol "Hapus" tidak berefek / profil tidak hilang | Tidak bisa menghapus profil terakhir yang tersisa (minimal harus ada satu) — buat profil lain dulu sebelum menghapus yang lama |

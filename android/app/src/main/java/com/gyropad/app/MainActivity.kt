@@ -7,13 +7,17 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CompoundButton
 import android.widget.EditText
 import android.widget.RadioGroup
 import android.widget.SeekBar
+import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.gyropad.app.input.GamepadInputManager
@@ -23,6 +27,8 @@ import com.gyropad.app.model.RumbleState
 import com.gyropad.app.net.GyroPadTransport
 import com.gyropad.app.net.TcpAdbTransport
 import com.gyropad.app.net.UdpTransport
+import com.gyropad.app.profile.ProfileStore
+import com.gyropad.app.profile.SensitivityProfile
 import com.gyropad.app.ui.CrosshairView
 
 /**
@@ -38,6 +44,8 @@ import com.gyropad.app.ui.CrosshairView
  *  - GyroManager juga melaporkan offset visual (terpisah dari data yang
  *    dikirim ke jaringan) ke [CrosshairView], sebagai alat kalibrasi gyro
  *    di dalam app (bukan overlay di atas game).
+ *  - [ProfileStore] menyimpan beberapa preset sensitivitas gyro (biasanya
+ *    satu per game) secara lokal, dipilih lewat dropdown profil.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -56,9 +64,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var labelIp: TextView
     private lateinit var usbHint: TextView
     private lateinit var radioGroupMode: RadioGroup
+    private lateinit var sensitivitySeek: SeekBar
 
     private var packetsSent = 0
     private var usbModeSelected = false
+
+    // --- Profil sensitivitas ---
+    private lateinit var profileStore: ProfileStore
+    private lateinit var profileAdapter: ArrayAdapter<String>
+    private lateinit var spinnerProfile: Spinner
+    private var profiles: MutableList<SensitivityProfile> = mutableListOf()
+    /** Dipakai supaya perubahan spinner yang kita picu sendiri (mis. saat
+     * profil baru dipilih otomatis) tidak dianggap sebagai "user memilih
+     * profil lain" dan memicu logika ganda. */
+    private var suppressSpinnerCallback = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,6 +86,7 @@ class MainActivity : AppCompatActivity() {
         gamepadInput = GamepadInputManager(state)
         gyroManager = GyroManager(this, state)
         vibrator = getVibrator()
+        profileStore = ProfileStore(this)
 
         ipInput = findViewById(R.id.editTextIp)
         portInput = findViewById(R.id.editTextPort)
@@ -75,10 +95,13 @@ class MainActivity : AppCompatActivity() {
         radioGroupMode = findViewById(R.id.radioGroupMode)
         val connectButton = findViewById<Button>(R.id.buttonConnect)
         val gyroSwitch = findViewById<Switch>(R.id.switchGyro)
-        val sensitivitySeek = findViewById<SeekBar>(R.id.seekBarSensitivity)
+        sensitivitySeek = findViewById(R.id.seekBarSensitivity)
         val gyroHoldButton = findViewById<Button>(R.id.buttonGyroHold)
         val recalibrateButton = findViewById<Button>(R.id.buttonRecalibrate)
         val calibrationStatusText = findViewById<TextView>(R.id.textCalibrationStatus)
+        spinnerProfile = findViewById(R.id.spinnerProfile)
+        val addProfileButton = findViewById<Button>(R.id.buttonAddProfile)
+        val deleteProfileButton = findViewById<Button>(R.id.buttonDeleteProfile)
         statusText = findViewById(R.id.textStatus)
         packetCountText = findViewById(R.id.textPacketCount)
         rumbleStatusText = findViewById(R.id.textRumbleStatus)
@@ -127,10 +150,19 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        setupProfileUi(addProfileButton, deleteProfileButton)
+
         sensitivitySeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 // progress 0..100 dipetakan ke sensitivitas 0.2x..3.0x
-                gyroManager.sensitivity = 0.2f + (progress / 100f) * 2.8f
+                val newSensitivity = progressToSensitivity(progress)
+                gyroManager.sensitivity = newSensitivity
+                // Hanya simpan ke profil kalau ini gara-gara user geser slider
+                // sendiri - bukan gara-gara applyProfile() men-set progress
+                // secara terprogram saat pindah/muat profil.
+                if (fromUser) {
+                    updateActiveProfileSensitivity(newSensitivity)
+                }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
@@ -224,5 +256,127 @@ class MainActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             v.vibrate(120)
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Profil sensitivitas
+    // ------------------------------------------------------------------
+
+    private fun progressToSensitivity(progress: Int): Float = 0.2f + (progress / 100f) * 2.8f
+
+    private fun sensitivityToProgress(sensitivity: Float): Int =
+        (((sensitivity - 0.2f) / 2.8f) * 100).toInt().coerceIn(0, 100)
+
+    private fun setupProfileUi(addProfileButton: Button, deleteProfileButton: Button) {
+        profiles = profileStore.loadProfiles()
+        profileAdapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            profiles.map { it.name }
+        )
+        profileAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerProfile.adapter = profileAdapter
+
+        val activeName = profileStore.getActiveProfileName()
+        val initialIndex = profiles.indexOfFirst { it.name == activeName }.let { if (it >= 0) it else 0 }
+        suppressSpinnerCallback = true
+        spinnerProfile.setSelection(initialIndex)
+        suppressSpinnerCallback = false
+        applyProfile(profiles[initialIndex])
+
+        spinnerProfile.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                if (suppressSpinnerCallback) return
+                val profile = profiles.getOrNull(position) ?: return
+                applyProfile(profile)
+                profileStore.setActiveProfileName(profile.name)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        addProfileButton.setOnClickListener { showAddProfileDialog() }
+        deleteProfileButton.setOnClickListener { deleteActiveProfile() }
+    }
+
+    /** Terapkan sensitivitas dari [profile] ke GyroManager & slider. */
+    private fun applyProfile(profile: SensitivityProfile) {
+        gyroManager.sensitivity = profile.sensitivity
+        sensitivitySeek.progress = sensitivityToProgress(profile.sensitivity)
+    }
+
+    /** Dipanggil tiap slider digeser MANUAL oleh user - nilai baru langsung
+     * disimpan ke profil yang lagi aktif, supaya tweak-nya persisten tanpa
+     * perlu langkah "simpan" terpisah. */
+    private fun updateActiveProfileSensitivity(sensitivity: Float) {
+        val position = spinnerProfile.selectedItemPosition
+        if (position < 0 || position >= profiles.size) return
+        profiles[position] = profiles[position].copy(sensitivity = sensitivity)
+        profileStore.saveProfiles(profiles)
+    }
+
+    private fun showAddProfileDialog() {
+        val input = EditText(this)
+        input.hint = "Nama game (mis. Monster Hunter Rise)"
+
+        AlertDialog.Builder(this)
+            .setTitle("Profil Sensitivitas Baru")
+            .setMessage("Sensitivitas slider saat ini akan disimpan sebagai profil baru.")
+            .setView(input)
+            .setPositiveButton("Simpan") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isEmpty()) {
+                    statusText.text = "Nama profil tidak boleh kosong"
+                    return@setPositiveButton
+                }
+                if (profiles.any { it.name.equals(name, ignoreCase = true) }) {
+                    statusText.text = "Profil \"$name\" sudah ada"
+                    return@setPositiveButton
+                }
+
+                val newProfile = SensitivityProfile(name, gyroManager.sensitivity)
+                profiles.add(newProfile)
+                profileStore.saveProfiles(profiles)
+
+                profileAdapter.clear()
+                profileAdapter.addAll(profiles.map { it.name })
+                profileAdapter.notifyDataSetChanged()
+
+                suppressSpinnerCallback = true
+                spinnerProfile.setSelection(profiles.size - 1)
+                suppressSpinnerCallback = false
+                profileStore.setActiveProfileName(newProfile.name)
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun deleteActiveProfile() {
+        if (profiles.size <= 1) {
+            statusText.text = "Minimal harus ada satu profil"
+            return
+        }
+        val position = spinnerProfile.selectedItemPosition
+        if (position < 0 || position >= profiles.size) return
+        val removedName = profiles[position].name
+
+        AlertDialog.Builder(this)
+            .setTitle("Hapus Profil")
+            .setMessage("Hapus profil \"$removedName\"?")
+            .setPositiveButton("Hapus") { _, _ ->
+                profiles.removeAt(position)
+                profileStore.saveProfiles(profiles)
+
+                profileAdapter.clear()
+                profileAdapter.addAll(profiles.map { it.name })
+                profileAdapter.notifyDataSetChanged()
+
+                suppressSpinnerCallback = true
+                spinnerProfile.setSelection(0)
+                suppressSpinnerCallback = false
+                applyProfile(profiles[0])
+                profileStore.setActiveProfileName(profiles[0].name)
+            }
+            .setNegativeButton("Batal", null)
+            .show()
     }
 }

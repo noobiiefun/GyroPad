@@ -109,7 +109,7 @@ maupun tool bawaan Windows) ada di [docs/TESTING.md](docs/TESTING.md).
 ## Roadmap / ide pengembangan
 
 Rencana singkat:
-- [ ] Ganti JSON dengan format biner supaya latency lebih rendah
+- [x] Ganti JSON dengan format biner supaya latency lebih rendah — **selesai di v0.3**
 - [ ] Kalibrasi & auto-recenter gyro yang lebih canggih (mis. deteksi diam)
 - [ ] Dukungan Linux (uinput) selain ViGEmBus/Windows
 

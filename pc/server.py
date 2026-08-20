@@ -1,10 +1,16 @@
 """
 GyroPad Server
 ==============
-Menerima paket JSON dari aplikasi Android GyroPad, mengemulasikan virtual
-Xbox 360 controller di Windows lewat ViGEmBus (via library `vgamepad`), dan
-mengirim BALIK rumble/getaran dari game ke HP - berguna kalau motor getar
-gamepad fisik kamu (mis. iPega 9076) tidak berfungsi.
+Menerima paket BINER (lihat binary_protocol.py) dari aplikasi Android
+GyroPad, mengemulasikan virtual Xbox 360 controller di Windows lewat
+ViGEmBus (via library `vgamepad`), dan mengirim BALIK rumble/getaran dari
+game ke HP - berguna kalau motor getar gamepad fisik kamu (mis. iPega
+9076) tidak berfungsi.
+
+Sejak v0.3, format paket adalah BINER, bukan JSON lagi - lebih kecil
+(44 byte vs ~150-180 byte JSON untuk paket state) dan lebih cepat di-parse,
+supaya latency tambahan dari serialisasi seminimal mungkin. Layout byte-nya
+didokumentasikan di binary_protocol.py dan docs/PROTOCOL.md.
 
 Dua mode transport:
 - udp  : HP & PC di WiFi yang sama (default)
@@ -20,12 +26,20 @@ Jalankan:
     python server.py --mode tcp --port 25565   # + jalankan adb reverse dulu
 """
 
+from __future__ import annotations
+
 import argparse
-import json
 import socket
 import sys
 import threading
 import time
+
+from binary_protocol import (
+    STATE_PACKET_SIZE,
+    RUMBLE_PACKET_SIZE,
+    decode_state,
+    encode_rumble,
+)
 
 try:
     import vgamepad as vg
@@ -60,8 +74,9 @@ def clamp(value: float, lo: float, hi: float) -> float:
 class GamepadCore:
     """
     Logika inti yang dipakai bersama oleh mode UDP maupun TCP: terima dict
-    state dari HP, terapkan ke virtual controller, dan expose callback rumble.
-    Supaya kode transport (UDP/TCP) tidak perlu tahu detail vgamepad.
+    state (hasil decode_state) dari HP, terapkan ke virtual controller, dan
+    expose callback rumble. Supaya kode transport (UDP/TCP) tidak perlu tahu
+    detail vgamepad.
     """
 
     def __init__(self, gyro_to_stick_scale: float, on_rumble):
@@ -79,16 +94,16 @@ class GamepadCore:
         self.on_rumble(large, small)
 
     def apply_state(self, data: dict) -> None:
-        lx = clamp(float(data.get("lx", 0.0)), -1.0, 1.0)
-        ly = clamp(float(data.get("ly", 0.0)), -1.0, 1.0)
-        rx = clamp(float(data.get("rx", 0.0)), -1.0, 1.0)
-        ry = clamp(float(data.get("ry", 0.0)), -1.0, 1.0)
-        lt = clamp(float(data.get("lt", 0.0)), 0.0, 1.0)
-        rt = clamp(float(data.get("rt", 0.0)), 0.0, 1.0)
-        buttons = int(data.get("btn", 0))
-        gyro_active = bool(data.get("gactive", False))
-        gyaw = float(data.get("gyaw", 0.0))
-        gpitch = float(data.get("gpitch", 0.0))
+        lx = clamp(data["lx"], -1.0, 1.0)
+        ly = clamp(data["ly"], -1.0, 1.0)
+        rx = clamp(data["rx"], -1.0, 1.0)
+        ry = clamp(data["ry"], -1.0, 1.0)
+        lt = clamp(data["lt"], 0.0, 1.0)
+        rt = clamp(data["rt"], 0.0, 1.0)
+        buttons = data["btn"]
+        gyro_active = data["gactive"]
+        gyaw = data["gyaw"]
+        gpitch = data["gpitch"]
 
         if gyro_active:
             rx += gyaw * self.gyro_to_stick_scale
@@ -114,11 +129,6 @@ class GamepadCore:
         self.gamepad.update()
 
 
-def rumble_packet(large: float, small: float) -> bytes:
-    payload = json.dumps({"type": "rumble", "large": large, "small": small})
-    return payload.encode("utf-8")
-
-
 class UdpServer:
     """Mode WiFi: satu socket UDP dipakai buat terima state & kirim balik rumble."""
 
@@ -141,25 +151,24 @@ class UdpServer:
         if addr is None:
             return
         try:
-            self.sock.sendto(rumble_packet(large, small), addr)
+            self.sock.sendto(encode_rumble(large, small), addr)
         except OSError:
             pass
 
     def run(self) -> None:
-        print(f"[GyroPad] Server (UDP/WiFi) jalan di port {self.port}")
+        print(f"[GyroPad] Server (UDP/WiFi, protokol biner) jalan di port {self.port}")
         print("[GyroPad] Menunggu koneksi dari HP... (buka app GyroPad & tekan Hubungkan)")
 
         while True:
             try:
-                raw, addr = self.sock.recvfrom(2048)
+                raw, addr = self.sock.recvfrom(256)
             except socket.timeout:
                 self._check_idle()
                 continue
 
-            try:
-                data = json.loads(raw.decode("utf-8"))
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                continue
+            data = decode_state(raw)
+            if data is None:
+                continue  # paket rusak/bukan state packet, abaikan
 
             with self.addr_lock:
                 if self.last_addr != addr:
@@ -181,8 +190,9 @@ class TcpServer:
     """
     Mode USB/ADB: HP menyambung ke 127.0.0.1:<port> di sisi HP, yang lewat
     `adb reverse tcp:<port> tcp:<port>` diteruskan ke port ini di PC.
-    Satu koneksi TCP dipakai dua arah: baca baris JSON (state) dari HP,
-    tulis baris JSON (rumble) balik ke HP saat game mengirim rumble.
+    Satu koneksi TCP dipakai dua arah: baca paket biner state (44 byte
+    tetap) dari HP, tulis paket biner rumble (9 byte tetap) balik ke HP
+    saat game mengirim rumble.
     """
 
     def __init__(self, port: int, gyro_scale: float):
@@ -197,7 +207,7 @@ class TcpServer:
         if conn is None:
             return
         try:
-            conn.sendall(rumble_packet(large, small) + b"\n")
+            conn.sendall(encode_rumble(large, small))
         except OSError:
             pass
 
@@ -206,7 +216,7 @@ class TcpServer:
         server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_sock.bind(("127.0.0.1", self.port))
         server_sock.listen(1)
-        print(f"[GyroPad] Server (TCP/USB) jalan di port {self.port}")
+        print(f"[GyroPad] Server (TCP/USB, protokol biner) jalan di port {self.port}")
         print("[GyroPad] Pastikan sudah jalankan: adb reverse tcp:%d tcp:%d" % (self.port, self.port))
         print("[GyroPad] Menunggu koneksi dari HP...")
 
@@ -222,27 +232,35 @@ class TcpServer:
             print("[GyroPad] Koneksi USB terputus, menunggu koneksi baru...")
 
     def _handle_connection(self, conn: socket.socket) -> None:
-        buffer = b""
         conn.settimeout(5.0)
         while True:
+            raw = self._recv_exactly(conn, STATE_PACKET_SIZE)
+            if raw is None:
+                break
+            data = decode_state(raw)
+            if data is None:
+                continue
+            self.core.apply_state(data)
+
+    @staticmethod
+    def _recv_exactly(conn: socket.socket, size: int) -> bytes | None:
+        """
+        Baca stream sampai persis [size] byte terkumpul - satu `recv()` di
+        TCP tidak dijamin mengembalikan semua byte yang diminta sekaligus.
+        Return None kalau koneksi terputus sebelum data lengkap terbaca.
+        """
+        buffer = b""
+        while len(buffer) < size:
             try:
-                chunk = conn.recv(4096)
+                chunk = conn.recv(size - len(buffer))
             except socket.timeout:
                 continue
             except OSError:
-                break
+                return None
             if not chunk:
-                break
+                return None
             buffer += chunk
-            while b"\n" in buffer:
-                line, buffer = buffer.split(b"\n", 1)
-                if not line.strip():
-                    continue
-                try:
-                    data = json.loads(line.decode("utf-8"))
-                except (json.JSONDecodeError, UnicodeDecodeError):
-                    continue
-                self.core.apply_state(data)
+        return buffer
 
 
 def main() -> None:

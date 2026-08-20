@@ -7,13 +7,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 
 /**
  * Transport lewat WiFi (UDP), untuk kasus HP & PC di jaringan yang sama.
+ *
+ * Sejak v0.3 memakai format BINER (lihat [BinaryProtocol]), bukan JSON lagi -
+ * paket state jadi 44 byte tetap (vs ~150-180 byte JSON), dan parsing di
+ * kedua sisi tinggal baca offset tanpa perlu parser teks.
  *
  * Satu [DatagramSocket] dipakai untuk DUA arah:
  * - loop kirim: mengirim snapshot [ControllerState] ke PC secara berkala
@@ -61,11 +64,11 @@ class UdpTransport(
                 while (true) {
                     val payload = synchronized(state) {
                         state.timestampMs = System.currentTimeMillis()
-                        val json = state.toJson()
+                        val bytes = BinaryProtocol.encodeState(state)
                         state.gyroYaw = 0f
                         state.gyroPitch = 0f
-                        json
-                    }.toByteArray(Charsets.UTF_8)
+                        bytes
+                    }
 
                     val packet = DatagramPacket(payload, payload.size, address, port)
                     socket?.send(packet)
@@ -78,13 +81,14 @@ class UdpTransport(
         }
 
         receiveJob = scope.launch(Dispatchers.IO) {
-            val buffer = ByteArray(512)
+            val buffer = ByteArray(64)
             try {
                 while (true) {
                     val packet = DatagramPacket(buffer, buffer.size)
                     socket?.receive(packet) ?: break
-                    val text = String(packet.data, 0, packet.length, Charsets.UTF_8)
-                    parseRumble(text)?.let { onRumbleReceived?.invoke(it) }
+                    BinaryProtocol.decodeRumble(packet.data, packet.length)?.let {
+                        onRumbleReceived?.invoke(it)
+                    }
                 }
             } catch (e: Exception) {
                 // Socket ditutup saat stop() -> exception ini normal, jangan dilaporkan sebagai error.
@@ -99,18 +103,5 @@ class UdpTransport(
         receiveJob = null
         socket?.close()
         socket = null
-    }
-
-    private fun parseRumble(text: String): RumbleState? {
-        return try {
-            val o = JSONObject(text)
-            if (o.optString("type") != "rumble") return null
-            RumbleState(
-                large = o.optDouble("large", 0.0).toFloat(),
-                small = o.optDouble("small", 0.0).toFloat()
-            )
-        } catch (e: Exception) {
-            null
-        }
     }
 }

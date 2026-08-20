@@ -128,7 +128,7 @@ sungguhan lewat scope) daripada fitur yang terhubung ke logika game.
 
 ## Sudah lebih dulu ada di roadmap (dari versi sebelumnya)
 
-- [ ] Ganti JSON dengan format biner supaya latency lebih rendah
+- [x] Ganti JSON dengan format biner supaya latency lebih rendah — **selesai di v0.3**, lihat [PROTOCOL.md](PROTOCOL.md)
 - [ ] Kalibrasi & auto-recenter gyro yang lebih canggih (mis. deteksi diam)
 - [ ] UI mapping tombol yang bisa dikustomisasi
 - [ ] Simpan profil sensitivitas per-game

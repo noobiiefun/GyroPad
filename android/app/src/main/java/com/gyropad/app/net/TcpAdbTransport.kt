@@ -7,9 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.InputStream
 import java.io.OutputStream
 import java.net.Socket
 
@@ -21,11 +19,12 @@ import java.net.Socket
  * bukan pilihan desain GyroPad. Lihat docs/SETUP_ADB.md untuk command
  * lengkapnya.
  *
- * Setelah `adb reverse` aktif, port di PC "muncul" sebagai localhost di sisi
- * HP - makanya host yang dipakai di sini SELALU "127.0.0.1", bukan IP WiFi.
- *
- * Format framing: newline-delimited JSON (satu baris = satu paket), supaya
- * gampang di-parse dari kedua sisi tanpa perlu length-prefix biner.
+ * Sejak v0.3 memakai format BINER (lihat [BinaryProtocol]). Karena TCP itu
+ * stream byte tanpa batas pesan otomatis (beda dari UDP yang per-datagram),
+ * framing di sini memanfaatkan bahwa UKURAN tiap jenis paket TETAP dan
+ * ARAHNYA TETAP: HP -> PC selalu 44 byte (state), PC -> HP selalu 9 byte
+ * (rumble). Jadi tidak perlu length-prefix tambahan, cukup baca persis
+ * [BinaryProtocol.RUMBLE_PACKET_SIZE] byte tiap kali menunggu rumble.
  */
 class TcpAdbTransport(
     private val state: ControllerState,
@@ -51,15 +50,18 @@ class TcpAdbTransport(
                 onStatusChanged?.invoke("Terhubung lewat USB (127.0.0.1:$port)")
 
                 val output: OutputStream = s.getOutputStream()
-                val reader = BufferedReader(InputStreamReader(s.getInputStream()))
+                val input: InputStream = s.getInputStream()
 
                 // Loop baca rumble berjalan di coroutine terpisah supaya tidak
                 // memblokir loop kirim state.
                 launch(Dispatchers.IO) {
                     try {
+                        val rumbleBuffer = ByteArray(BinaryProtocol.RUMBLE_PACKET_SIZE)
                         while (true) {
-                            val line = reader.readLine() ?: break
-                            parseRumble(line)?.let { onRumbleReceived?.invoke(it) }
+                            readExactly(input, rumbleBuffer) ?: break
+                            BinaryProtocol.decodeRumble(rumbleBuffer, rumbleBuffer.size)?.let {
+                                onRumbleReceived?.invoke(it)
+                            }
                         }
                     } catch (e: Exception) {
                         // socket ditutup saat stop() -> wajar, tidak perlu dilaporkan
@@ -70,12 +72,12 @@ class TcpAdbTransport(
                 while (true) {
                     val payload = synchronized(state) {
                         state.timestampMs = System.currentTimeMillis()
-                        val json = state.toJson()
+                        val bytes = BinaryProtocol.encodeState(state)
                         state.gyroYaw = 0f
                         state.gyroPitch = 0f
-                        json
+                        bytes
                     }
-                    output.write((payload + "\n").toByteArray(Charsets.UTF_8))
+                    output.write(payload)
                     output.flush()
                     onPacketSent?.invoke()
                     delay(intervalMs)
@@ -97,16 +99,19 @@ class TcpAdbTransport(
         socket = null
     }
 
-    private fun parseRumble(text: String): RumbleState? {
-        return try {
-            val o = JSONObject(text)
-            if (o.optString("type") != "rumble") return null
-            RumbleState(
-                large = o.optDouble("large", 0.0).toFloat(),
-                small = o.optDouble("small", 0.0).toFloat()
-            )
-        } catch (e: Exception) {
-            null
+    /**
+     * Baca stream sampai [buffer] terisi penuh - satu `InputStream.read()`
+     * di TCP tidak dijamin mengembalikan semua byte yang diminta sekaligus,
+     * jadi perlu loop sampai benar-benar lengkap. Return null kalau stream
+     * berakhir (koneksi ditutup) sebelum data lengkap terbaca.
+     */
+    private fun readExactly(input: InputStream, buffer: ByteArray): ByteArray? {
+        var offset = 0
+        while (offset < buffer.size) {
+            val read = input.read(buffer, offset, buffer.size - offset)
+            if (read == -1) return null
+            offset += read
         }
+        return buffer
     }
 }

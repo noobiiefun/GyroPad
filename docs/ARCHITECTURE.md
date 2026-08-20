@@ -17,8 +17,9 @@ lewat WiFi:
    Kedua sumber ini ditulis ke satu objek state bersama (`ControllerState`),
    lalu dikirim berkala ke PC lewat UDP.
 
-2. **PC server** (`pc/server.py`) — menerima paket UDP, mem-parsing JSON,
-   dan memetakannya ke virtual Xbox 360 controller lewat `vgamepad`
+2. **PC server** (`pc/server.py`) — menerima paket biner (lihat
+   [PROTOCOL.md](PROTOCOL.md)), decode lewat `binary_protocol.py`, dan
+   memetakannya ke virtual Xbox 360 controller lewat `vgamepad`
    (wrapper Python untuk driver **ViGEmBus**). Dari sudut pandang Windows/
    game, ini terlihat persis seperti controller Xbox asli yang tercolok.
 
@@ -56,12 +57,20 @@ real-time, paket yang telat lebih baik dilewati saja daripada di-retransmit
 Opsi ADB-over-USB sebagai mode alternatif (latency lebih rendah & lebih
 stabil) ada di roadmap.
 
-### Kenapa JSON, bukan format biner?
-JSON dipilih di versi baseline ini karena mudah dibaca & didebug saat
-prototyping (tinggal `print()` paket mentah untuk lihat apa yang salah).
-Trade-off-nya ukuran paket lebih besar & parsing lebih lambat dibanding
-biner. Untuk tuning latency lebih jauh, lihat catatan optimasi di
-[PROTOCOL.md](PROTOCOL.md).
+### Kenapa format biner, bukan JSON?
+Versi awal (v0.1-v0.2) sempat memakai JSON karena mudah dibaca & didebug
+saat prototyping (tinggal `print()` paket mentah untuk lihat isinya). Tapi
+untuk paket yang dikirim puluhan-ratusan kali per detik, JSON teks
+(~150-180 byte/paket dengan semua tanda kutip, kurung kurawal, nama field)
+signifikan lebih besar dan lebih lambat di-parse dibanding biner (44 byte
+tetap, tinggal baca offset). Sejak v0.3, protokol diganti total ke format
+biner — layout byte lengkapnya ada di [PROTOCOL.md](PROTOCOL.md), dan
+implementasinya di `BinaryProtocol.kt` (Android) / `binary_protocol.py`
+(PC). Trade-off-nya: paket biner jauh lebih sulit dibaca manual saat
+debug (tidak bisa `print()` langsung dan dibaca sekilas seperti JSON) -
+kalau perlu debug isi paket, cara paling gampang adalah panggil
+`decode_state()`/`decode_rumble()` lalu `print()` hasil dict-nya, bukan
+`print()` byte mentah.
 
 ## Alur data per frame
 
@@ -75,10 +84,10 @@ GamepadInputManager.onGenericMotionEvent()/onKeyEvent()
 GyroManager.onSensorChanged()
         │
         ▼
-UdpGamepadSender (loop coroutine terpisah, kirim @ ~120Hz)
-        │  JSON via UDP
+UdpTransport / TcpAdbTransport (loop coroutine terpisah, kirim @ 120Hz/60Hz)
+        │  paket biner 44 byte, via UDP atau TCP
         ▼
-server.py: GyroPadServer.apply_state()
+server.py: GamepadCore.apply_state()
         │  gyaw/gpitch ditambahkan ke right stick jika gactive=true
         ▼
 vgamepad.VX360Gamepad.update()
@@ -96,7 +105,9 @@ Sejak v0.2, komunikasi HP↔PC diabstraksikan lewat interface
   terima rumble), karena PC membalas ke alamat pengirim paket terakhir.
 - `TcpAdbTransport` — USB, terhubung ke `127.0.0.1:<port>` (hasil tunneling
   `adb reverse`, lihat [SETUP_ADB.md](SETUP_ADB.md)) memakai satu koneksi
-  TCP dua arah, framing newline-delimited JSON.
+  TCP dua arah. Karena format sudah biner dengan ukuran tetap per jenis
+  paket (44 byte state, 9 byte rumble), framing-nya cukup "baca persis
+  sejumlah itu byte", tanpa perlu delimiter atau length-prefix tambahan.
 
 `adb reverse`/`adb forward` cuma bisa nge-tunnel TCP, itu sebabnya mode USB
 tidak bisa memakai UDP seperti mode WiFi — ini keterbatasan ADB, bukan
@@ -119,7 +130,7 @@ ViGEmBus -> vgamepad.register_notification() callback terpanggil
 GamepadCore._handle_rumble_notification() (server.py)
         │  dinormalisasi ke 0.0-1.0
         ▼
-UdpServer/TcpServer mengirim {"type":"rumble", "large":.., "small":..}
+UdpServer/TcpServer mengirim paket biner rumble (type=0x02, lihat PROTOCOL.md)
    ke alamat/koneksi HP yang sedang aktif
         │
         ▼

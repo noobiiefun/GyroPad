@@ -25,6 +25,13 @@ data class ControllerState(
     var gyroActive: Boolean = false,
     var timestampMs: Long = 0L
 ) {
+    /**
+     * Representasi teks (JSON) - HANYA untuk debugging manual (mis. di-print
+     * ke Logcat buat lihat isi state), TIDAK dipakai untuk pengiriman ke
+     * jaringan lagi sejak v0.3. Format biner asli ada di [BinaryProtocol]
+     * (lebih kecil & lebih cepat di-parse, lihat komentarnya untuk alasan
+     * lengkap).
+     */
     fun toJson(): String {
         val o = JSONObject()
         o.put("lx", leftX)

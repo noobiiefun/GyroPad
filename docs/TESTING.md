@@ -25,9 +25,11 @@ Cara paling sederhana untuk memperkirakan latency jaringan:
 1. Pastikan jam HP & PC kurang lebih sinkron (biasanya otomatis lewat NTP,
    selisihnya di jaringan lokal biasanya sangat kecil).
 2. Tambahkan log sementara di `server.py` untuk membandingkan `ts` dari
-   paket dengan `time.time() * 1000` saat paket diterima:
+   paket dengan `time.time() * 1000` saat paket diterima - `decode_state()`
+   di `binary_protocol.py` sudah mengembalikan dict dengan key `"ts"`,
+   jadi tinggal tempel di `GamepadCore.apply_state()`:
    ```python
-   # tempel sementara di GamepadCore.apply_state() atau di titik terima paket
+   # tempel sementara di awal apply_state()
    latency_ms = (time.time() * 1000) - data.get("ts", 0)
    print(f"latency: {latency_ms:.1f} ms")
    ```

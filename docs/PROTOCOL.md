@@ -1,68 +1,96 @@
 # Protokol Data GyroPad
 
-Versi: `0.2` (JSON, dua arah, UDP atau TCP)
+Versi: `0.3` (BINER, dua arah, UDP atau TCP)
+
+> Sebelum v0.3, protokol ini pakai JSON teks. Sudah diganti total ke format
+> biner demi latency lebih rendah (paket lebih kecil, parsing lebih cepat).
+> Kalau kamu lihat referensi JSON di kode lama/commit lama, itu format usang
+> — dokumen ini HANYA mendeskripsikan format biner yang dipakai sekarang.
 
 ## Transport
 
-GyroPad mendukung dua mode transport, tapi FORMAT PAKET-nya sama persis di
-keduanya — cuma cara framing-nya beda:
+GyroPad mendukung dua mode transport, tapi FORMAT PAKET BINER-nya sama
+persis di keduanya — cuma cara framing-nya beda:
 
 | Mode | Protokol | Framing | Kapan dipakai |
 |---|---|---|---|
-| WiFi | UDP | satu datagram = satu paket JSON | default, HP & PC satu jaringan |
-| USB/ADB | TCP (via `adb reverse`) | newline-delimited JSON (satu baris = satu paket) | lihat [SETUP_ADB.md](SETUP_ADB.md) |
+| WiFi | UDP | satu datagram = satu paket biner (batas paket otomatis dari UDP) | default, HP & PC satu jaringan |
+| USB/ADB | TCP (via `adb reverse`) | ukuran paket TETAP per arah (44 byte state, 9 byte rumble) — dibaca persis sejumlah itu, tanpa delimiter | lihat [SETUP_ADB.md](SETUP_ADB.md) |
 
 - Default port: `25565` (bisa diganti, lihat `--port` di `server.py` dan
   field Port di app Android — HARUS sama di kedua sisi)
 - Rate kirim state (HP → PC): **120 paket/detik** mode UDP, **60 paket/detik**
   mode TCP (`sendRateHz` di `UdpTransport.kt` / `TcpAdbTransport.kt`)
-- Sekarang komunikasi **DUA ARAH**: selain state HP→PC, ada juga paket
-  rumble PC→HP (lihat bagian bawah).
+- Komunikasi **DUA ARAH**: selain state HP→PC, ada juga paket rumble PC→HP
+  (lihat bagian bawah).
+- Semua angka multi-byte pakai **big-endian** (network byte order). Ini
+  WAJIB sama di kedua sisi — Android pakai
+  `ByteBuffer.order(ByteOrder.BIG_ENDIAN)`, Python pakai `'>'` di format
+  `struct`. Kalau salah satu sisi diubah ke little-endian tanpa mengubah
+  yang lain, semua angka float/int akan terbaca kacau tanpa error yang
+  jelas (silent corruption) — jadi ini bagian paling penting untuk dijaga
+  konsisten kalau ada yang mau modifikasi protokol ini.
 
-## Format paket
+## Kenapa ganti dari JSON ke biner?
 
-Setiap paket adalah satu objek JSON UTF-8, dikirim sebagai isi datagram UDP
-(tanpa header tambahan). Contoh:
+Paket state dikirim puluhan-ratusan kali per detik. JSON teks (~150-180
+byte per paket dengan semua tanda kutip, kurung kurawal, nama field)
+signifikan lebih besar dan lebih lambat di-parse dibanding biner (44 byte
+tetap, tinggal baca offset per field). Untuk input real-time seperti
+gyro-aim, setiap milidetik yang dihemat dari serialisasi ikut mengurangi
+latency yang terasa di tangan.
 
-```json
-{
-  "lx": 0.42,
-  "ly": -0.10,
-  "rx": 0.0,
-  "ry": 0.0,
-  "lt": 0.0,
-  "rt": 1.0,
-  "btn": 20,
-  "gyaw": 1.35,
-  "gpitch": -0.22,
-  "gactive": true,
-  "ts": 1732000000123
-}
-```
+## Paket STATE (HP → PC) — 44 byte
 
-| Field     | Tipe    | Rentang        | Keterangan                                                                 |
-|-----------|---------|----------------|------------------------------------------------------------------------|
-| `lx`      | float   | -1.0 .. 1.0    | Left stick sumbu X                                                     |
-| `ly`      | float   | -1.0 .. 1.0    | Left stick sumbu Y                                                     |
-| `rx`      | float   | -1.0 .. 1.0    | Right stick sumbu X (dari gamepad fisik, belum ditambah gyro)          |
-| `ry`      | float   | -1.0 .. 1.0    | Right stick sumbu Y (dari gamepad fisik, belum ditambah gyro)          |
-| `lt`      | float   | 0.0 .. 1.0     | Left trigger analog                                                    |
-| `rt`      | float   | 0.0 .. 1.0     | Right trigger analog                                                   |
-| `btn`     | int     | bitmask        | Lihat tabel bitmask tombol di bawah                                    |
-| `gyaw`    | float   | derajat        | Delta rotasi yaw (kiri/kanan) sejak paket sebelumnya                   |
-| `gpitch`  | float   | derajat        | Delta rotasi pitch (atas/bawah) sejak paket sebelumnya                 |
-| `gactive` | boolean | true/false     | Apakah gyro sedang aktif (mis. tombol hold-to-aim sedang ditekan)      |
-| `ts`      | long    | epoch ms       | Timestamp saat paket dibuat di HP (buat debugging latency)             |
+| Offset | Ukuran | Field      | Tipe          | Rentang / Keterangan |
+|--------|--------|------------|---------------|----------------------|
+| 0      | 1      | `type`     | uint8         | Selalu `0x01` (TYPE_STATE) |
+| 1      | 4      | `lx`       | float32       | -1.0 .. 1.0, left stick sumbu X |
+| 5      | 4      | `ly`       | float32       | -1.0 .. 1.0, left stick sumbu Y |
+| 9      | 4      | `rx`       | float32       | -1.0 .. 1.0, right stick sumbu X (dari gamepad fisik, belum ditambah gyro) |
+| 13     | 4      | `ry`       | float32       | -1.0 .. 1.0, right stick sumbu Y (dari gamepad fisik, belum ditambah gyro) |
+| 17     | 4      | `lt`       | float32       | 0.0 .. 1.0, left trigger analog |
+| 21     | 4      | `rt`       | float32       | 0.0 .. 1.0, right trigger analog |
+| 25     | 2      | `buttons`  | uint16        | Bitmask, lihat tabel di bawah |
+| 27     | 4      | `gyaw`     | float32       | Derajat, delta rotasi yaw sejak paket sebelumnya |
+| 31     | 4      | `gpitch`   | float32       | Derajat, delta rotasi pitch sejak paket sebelumnya |
+| 35     | 1      | `gactive`  | uint8 (0/1)   | Apakah gyro sedang aktif (hold-to-aim) |
+| 36     | 8      | `ts`       | int64         | Epoch milliseconds saat paket dibuat di HP |
+
+Total: **44 byte**.
 
 Catatan penting soal `gyaw`/`gpitch`: nilai ini adalah **delta akumulatif
 sejak paket terakhir dikirim**, bukan posisi absolut. Server harus
 menambahkannya ke posisi stick saat ini, bukan menimpanya. Setelah satu
 paket terkirim, sisi Android mereset akumulator ini ke 0.
 
-## Bitmask tombol (`btn`)
+## Paket RUMBLE (PC → HP) — 9 byte
 
-Harus identik antara `ControllerState.kt` (Android) dan `BUTTON_MAP` di
-`server.py`. Kalau menambah tombol baru, update KEDUA sisi.
+| Offset | Ukuran | Field   | Tipe    | Rentang / Keterangan |
+|--------|--------|---------|---------|----------------------|
+| 0      | 1      | `type`  | uint8   | Selalu `0x02` (TYPE_RUMBLE) |
+| 1      | 4      | `large` | float32 | 0.0 .. 1.0, motor rumble berat/low-frequency |
+| 5      | 4      | `small` | float32 | 0.0 .. 1.0, motor rumble ringan/high-frequency |
+
+Total: **9 byte**.
+
+Arah ini terjadi saat game mengirim rumble ke virtual controller di PC —
+lihat `GamepadCore._handle_rumble_notification` di `server.py`. Di sisi
+Android, dua nilai motor ini digabung jadi satu intensitas (karena
+kebanyakan HP cuma punya satu motor getar) lewat
+`RumbleState.combinedIntensity()`, lalu dipetakan ke amplitude
+`VibrationEffect` (API 26+) atau `vibrate(ms)` biasa di Android lama.
+
+Catatan: mode UDP mengirim balik rumble ke alamat pengirim paket state
+TERAKHIR yang diterima server — jadi pastikan app tetap mengirim state
+secara berkala (sudah otomatis, selama app aktif & terhubung) supaya server
+tahu ke mana harus membalas.
+
+## Bitmask tombol (`buttons`)
+
+Harus identik antara `GamepadButton` (`ControllerState.kt`, Android) dan
+`BUTTON_MAP` di `server.py`. Kalau menambah tombol baru, update KEDUA sisi
+sekaligus.
 
 | Bit (nilai)   | Tombol         |
 |---------------|----------------|
@@ -81,12 +109,15 @@ Harus identik antara `ControllerState.kt` (Android) dan `BUTTON_MAP` di
 | `1 << 12`     | D-Pad Left     |
 | `1 << 13`     | D-Pad Right    |
 
-Contoh: `btn = 20` berarti bit 2 (X, nilai 4) + bit 4 (L1, nilai 16) sedang
-ditekan bersamaan (4 + 16 = 20).
+Nilai maksimum bitmask saat ini `0x3FFF` (16383, 14 bit terisi semua),
+jelas muat di uint16 (offset 25-26 di paket state).
+
+Contoh: `buttons = 20` berarti bit 2 (X, nilai 4) + bit 4 (L1, nilai 16)
+sedang ditekan bersamaan (4 + 16 = 20).
 
 Catatan: L1 di baseline ini dipakai ganda sebagai tombol hold-to-aim gyro
 (lihat `MainActivity.kt`), jadi saat L1 ditekan, `gactive` otomatis `true`
-DAN bit L1 di `btn` juga ikut `1`. Kalau kamu tidak ingin L1 terkirim
+DAN bit L1 di `buttons` juga ikut `1`. Kalau kamu tidak ingin L1 terkirim
 sebagai tombol biasa ke game saat dipakai untuk gyro, silakan sesuaikan di
 `dispatchKeyEvent()`.
 
@@ -105,47 +136,24 @@ if gyro_active:
 `server.py` (default `0.02`). Semakin besar nilainya, semakin sensitif
 gyro-nya.
 
-## Paket rumble (PC → HP)
+## Implementasi referensi
 
-Arah sebaliknya: saat game mengirim rumble ke virtual controller, server
-meneruskannya ke HP sebagai paket JSON terpisah:
+- Android: `android/app/src/main/java/com/gyropad/app/net/BinaryProtocol.kt`
+  (`encodeState()` untuk paket state, `decodeRumble()` untuk paket rumble)
+- Python: `pc/binary_protocol.py` (`decode_state()` dan `encode_rumble()`)
 
-```json
-{
-  "type": "rumble",
-  "large": 0.75,
-  "small": 0.0
-}
-```
+Kedua file ini **saling bergantung** — kalau ubah layout byte di salah
+satu, wajib ubah juga di file satunya dengan format persis sama, atau
+komunikasi akan gagal total (bukan error yang jelas, tapi data yang
+terbaca ngaco).
 
-| Field   | Tipe    | Rentang     | Keterangan                                         |
-|---------|---------|-------------|---------------------------------------------------|
-| `type`  | string  | `"rumble"`  | Penanda jenis paket (state HP→PC tidak punya field ini) |
-| `large` | float   | 0.0 .. 1.0  | Motor rumble berat/low-frequency (dinormalisasi dari byte 0-255 milik ViGEmBus) |
-| `small` | float   | 0.0 .. 1.0  | Motor rumble ringan/high-frequency                 |
+## Rencana optimasi lanjutan (belum diimplementasikan)
 
-Di sisi Android, dua nilai motor ini digabung jadi satu intensitas (karena
-kebanyakan HP cuma punya satu motor getar) lewat
-`RumbleState.combinedIntensity()`, lalu dipetakan ke amplitude
-`VibrationEffect` (API 26+) atau `vibrate(ms)` biasa di Android lama.
-
-Catatan: mode UDP mengirim balik rumble ke alamat pengirim paket state
-TERAKHIR yang diterima server — jadi pastikan app tetap mengirim state
-secara berkala (sudah otomatis, selama app aktif & terhubung) supaya server
-tahu ke mana harus membalas.
-
-## Rencana optimasi (belum diimplementasikan)
-
-Untuk versi berikutnya, format biner (`struct`) lebih disarankan untuk
-menekan ukuran paket dan waktu parsing, misalnya:
-
-```
-[4 bytes lx][4 bytes ly][4 bytes rx][4 bytes ry]
-[4 bytes lt][4 bytes rt][2 bytes btn]
-[4 bytes gyaw][4 bytes gpitch][1 byte gactive]
-[8 bytes ts]
-```
-
-= 39 byte per paket (vs ~180 byte untuk JSON setara), dikodekan pakai
-`java.nio.ByteBuffer` di Android dan modul `struct` di Python. Ini masuk
-roadmap, kontribusi welcome.
+- **Version byte**: menambah 1 byte versi protokol di awal paket, supaya
+  kalau format berubah lagi di masa depan, kedua sisi bisa saling
+  mendeteksi ketidakcocokan versi dan memberi pesan error yang jelas
+  (dibanding sekarang: paket dengan layout salah cuma di-skip diam-diam
+  lewat validasi `len(raw) != STATE_PACKET_SIZE`).
+- **Delta/interpolasi stick**: untuk mode dengan bandwidth sangat terbatas,
+  bisa dipertimbangkan hanya mengirim field yang berubah dari paket
+  sebelumnya (perlu skema flag/dirty-bit tambahan).

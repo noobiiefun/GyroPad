@@ -71,7 +71,9 @@ gyropad/
     ├── PROTOCOL.md       # Spesifikasi paket data (state & rumble)
     ├── SETUP_ANDROID.md  # Build & pasang app
     ├── SETUP_PC.md       # Setup server
-    └── SETUP_ADB.md      # Setup mode USB
+    ├── SETUP_ADB.md      # Setup mode USB
+    ├── TESTING.md        # Cara uji latency & tombol
+    └── ROADMAP.md        # Rencana fitur ke depan (detail)
 ```
 
 ## Fitur
@@ -99,14 +101,24 @@ gyropad/
 Detail lengkap paket JSON dua arah (state HP→PC, rumble PC→HP) ada di
 [docs/PROTOCOL.md](docs/PROTOCOL.md).
 
+## Testing
+
+Cara menguji latency & mapping tombol GyroPad (baik pakai tool eksternal
+maupun tool bawaan Windows) ada di [docs/TESTING.md](docs/TESTING.md).
+
 ## Roadmap / ide pengembangan
 
+Rencana singkat:
 - [ ] Ganti JSON dengan format biner supaya latency lebih rendah
 - [ ] Kalibrasi & auto-recenter gyro yang lebih canggih (mis. deteksi diam)
-- [ ] UI mapping tombol yang bisa dikustomisasi
-- [ ] Simpan profil sensitivitas per-game
 - [ ] Dukungan Linux (uinput) selain ViGEmBus/Windows
-- [ ] Overlay HUD sungguhan di layar PC (bukan cuma preview di app HP)
+
+Rencana yang lebih besar (server sebagai driver ringan/tray app, notifikasi
+suara saat connect, indikator status PC↔HP dan Gamepad↔HP terpisah,
+achievement lokal, pengaturan sensitivitas & haptic yang lebih lengkap, mode
+kamera belakang + crosshair AR ala scope FPS) dijelaskan detail di
+[docs/ROADMAP.md](docs/ROADMAP.md), termasuk pertimbangan desainnya
+masing-masing.
 
 ## Kontribusi
 

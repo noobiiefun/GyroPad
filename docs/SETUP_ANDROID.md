@@ -45,6 +45,10 @@ Bluetooth HID standar lainnya.
 
 ## Menghubungkan ke PC
 
+App punya dua mode koneksi, pilih lewat radio button di bagian atas:
+
+### Mode WiFi (UDP) — default
+
 1. Pastikan PC sudah menjalankan `server.py` (lihat
    [SETUP_PC.md](SETUP_PC.md)) dan **HP + PC berada di jaringan WiFi yang
    sama** (mis. sama-sama connect ke router rumah, atau HP connect ke
@@ -52,12 +56,21 @@ Bluetooth HID standar lainnya.
 2. Cari tahu IP lokal PC kamu:
    - Windows: buka Command Prompt, jalankan `ipconfig`, catat `IPv4
      Address` di adapter WiFi/Ethernet yang aktif.
-3. Di app GyroPad, isi field **IP PC** dengan IP tadi (mis. `192.168.1.42`)
-   dan **Port** dengan `25565` (default, samakan dengan yang dipakai
-   `server.py`).
+3. Pilih mode **"WiFi (UDP)"**, isi field **IP PC** dengan IP tadi (mis.
+   `192.168.1.42`) dan **Port** dengan `25565` (default, samakan dengan
+   yang dipakai `server.py`).
 4. Tekan **Hubungkan ke PC**. Kalau berhasil, status akan berubah jadi
    "Mengirim ke ...", dan di terminal `server.py` akan muncul log
    `Terhubung dengan <ip HP>`.
+
+### Mode USB (ADB)
+
+Dipakai kalau WiFi tidak stabil, atau memang mau latency lebih rendah lewat
+kabel. Butuh setup tambahan di PC (`adb reverse`) — langkah lengkapnya ada
+di [SETUP_ADB.md](SETUP_ADB.md). Setelah `server.py --mode tcp` jalan dan
+`adb reverse` sudah dijalankan, pilih mode **"USB (ADB)"** di app (field IP
+otomatis disembunyikan karena selalu `127.0.0.1`), isi Port yang sama, lalu
+**Hubungkan ke PC**.
 
 ## Menggunakan gyro-aim
 
@@ -70,6 +83,19 @@ Bluetooth HID standar lainnya.
 - Tombol besar **"TAHAN untuk GYRO AIM"** di layar app hanya untuk testing
   cepat tanpa perlu gamepad terpasang.
 
+## Crosshair kalibrasi & rumble
+
+- Panel **"Preview arah gyro"** di bawah tombol gyro-aim menampilkan
+  crosshair yang bergerak mengikuti gerakan HP saat gyro aktif — ini alat
+  bantu buat merasakan/mengatur sensitivitas SEBELUM masuk game. Panel ini
+  ada di dalam app HP, bukan overlay di atas layar game (app HP memang
+  tidak bisa menggambar di atas layar PC).
+- Teks **"Rumble dari game"** menunjukkan status getaran yang diterima
+  balik dari PC. Ini menggantikan motor getar gamepad fisik yang tidak
+  berfungsi — HP akan bergetar setiap kali game mengirim rumble ke virtual
+  controller di PC. Tidak semua game/momen memicu rumble, jadi ini normal
+  kalau kadang diam saja.
+
 ## Troubleshooting
 
 | Masalah | Kemungkinan penyebab |
@@ -78,3 +104,5 @@ Bluetooth HID standar lainnya.
 | "Sensor gyroscope tidak tersedia di device ini" | HP kamu memang tidak punya chip gyroscope fisik — fitur gyro tidak bisa dipakai, tapi gamepad tetap berfungsi normal |
 | Status tidak berubah dari "Belum terhubung" / packet count tidak naik | Cek lagi IP PC, pastikan satu jaringan WiFi, cek firewall Windows tidak memblokir port UDP yang dipakai |
 | Gyro terasa terlalu sensitif/lambat | Atur slider **Sensitivitas Gyro** di app, atau argumen `--gyro-scale` di `server.py` |
+| Mode USB stuck di "Menyambung ke PC lewat USB..." | Lihat troubleshooting khusus di [SETUP_ADB.md](SETUP_ADB.md) |
+| HP tidak bergetar sama sekali walau ada rumble di game | Cek izin VIBRATE tidak diblokir di pengaturan aplikasi (`Settings > Apps > GyroPad > Permissions`), dan cek game memang mengirim rumble ke controller Xbox |

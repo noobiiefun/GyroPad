@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="match_parent">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="24dp">
 
@@ -22,6 +26,35 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:text="Mode koneksi" />
+
+    <RadioGroup
+        android:id="@+id/radioGroupMode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/radioWifi"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:checked="true"
+            android:text="WiFi (UDP)" />
+
+        <RadioButton
+            android:id="@+id/radioUsb"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="USB (ADB)" />
+    </RadioGroup>
+
+    <TextView
+        android:id="@+id/labelIp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:text="IP PC (server)" />
 
     <EditText
@@ -43,6 +76,16 @@
         android:layout_height="wrap_content"
         android:hint="25565"
         android:inputType="number" />
+
+    <TextView
+        android:id="@+id/textUsbHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Mode USB: jalankan &quot;adb reverse tcp:25565 tcp:25565&quot; dulu di PC, lalu field IP di atas diabaikan (selalu 127.0.0.1)."
+        android:textSize="12sp"
+        android:textStyle="italic"
+        android:visibility="gone" />
 
     <Button
         android:id="@+id/buttonConnect"
@@ -97,4 +140,31 @@
         android:layout_marginTop="16dp"
         android:text="TAHAN untuk GYRO AIM (tes tanpa L1)" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Preview arah gyro (kalibrasi, bukan tampilan in-game)" />
+
+    <com.gyropad.app.ui.CrosshairView
+        android:id="@+id/crosshairView"
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:layout_marginTop="8dp"
+        android:background="#11000000" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="#33000000" />
+
+    <TextView
+        android:id="@+id/textRumbleStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Rumble dari game: tidak aktif" />
+
 </LinearLayout>
+</ScrollView>

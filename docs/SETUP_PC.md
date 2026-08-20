@@ -31,23 +31,30 @@ pip install -r requirements.txt
 python server.py
 ```
 
+Ini menjalankan mode WiFi (UDP) secara default. Kalau mau pakai USB/ADB,
+lihat [SETUP_ADB.md](SETUP_ADB.md) — command-nya beda (`--mode tcp`).
+
 Secara default, server:
 - Mendengarkan di port UDP `25565`
 - Skala pengaruh gyro ke stick: `0.02`
 - Reset controller ke netral kalau tidak ada paket masuk selama 2 detik
   (mis. app HP ditutup / koneksi putus) — supaya stick tidak "nyangkut"
+- Mendengarkan rumble dari game lewat `register_notification` milik
+  `vgamepad`, dan mengirimkannya balik ke HP yang sedang terhubung (lihat
+  [PROTOCOL.md](PROTOCOL.md) bagian "Paket rumble")
 
 Opsi yang bisa diubah:
 
 ```bash
-python server.py --port 25565 --gyro-scale 0.02 --timeout 2.0
+python server.py --mode udp --port 25565 --gyro-scale 0.02 --timeout 2.0
 ```
 
 | Argumen | Default | Keterangan |
 |---|---|---|
-| `--port` | `25565` | Port UDP, harus sama dengan yang diisi di app Android |
+| `--mode` | `udp` | `udp` (WiFi) atau `tcp` (USB/ADB, lihat SETUP_ADB.md) |
+| `--port` | `25565` | Port, harus sama dengan yang diisi di app Android |
 | `--gyro-scale` | `0.02` | Semakin besar, semakin sensitif gyro-nya |
-| `--timeout` | `2.0` | Detik idle sebelum controller direset ke netral |
+| `--timeout` | `2.0` | [mode udp saja] Detik idle sebelum controller direset ke netral |
 
 Saat pertama kali menjalankan `server.py`, Windows biasanya akan
 memunculkan dialog **Windows Defender Firewall** minta izin akses jaringan
@@ -81,3 +88,4 @@ aktif.
 | Error terkait ViGEmBus / virtual device gagal dibuat | Pastikan ViGEmBus driver benar-benar terpasang (cek Device Manager, cari "Nefarius Virtual Gamepad Emulation Bus"), restart PC setelah instalasi |
 | Server jalan tapi tidak ada log "Terhubung dengan ..." | HP belum kirim paket — cek [SETUP_ANDROID.md](SETUP_ANDROID.md) bagian "Menghubungkan ke PC", cek firewall |
 | Stick di game "nyangkut" ke satu arah setelah app HP ditutup paksa | Tunggu beberapa detik (default timeout 2 detik), server otomatis reset ke netral. Kalau tidak, restart `server.py` |
+| HP tidak pernah bergetar walau game seharusnya kasih rumble | Tidak semua game mengirim rumble ke controller Xbox (tergantung implementasi game-nya); pastikan juga toggle rumble/vibration aktif di pengaturan game tersebut |

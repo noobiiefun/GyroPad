@@ -87,6 +87,74 @@ vgamepad.VX360Gamepad.update()
    Game menerima input sebagai controller Xbox biasa
 ```
 
+## Transport ganda: WiFi (UDP) vs USB (TCP/ADB)
+
+Sejak v0.2, komunikasi HP↔PC diabstraksikan lewat interface
+`GyroPadTransport` (`net/GyroPadTransport.kt`), dengan dua implementasi:
+
+- `UdpTransport` — WiFi, satu `DatagramSocket` dipakai dua arah (kirim state,
+  terima rumble), karena PC membalas ke alamat pengirim paket terakhir.
+- `TcpAdbTransport` — USB, terhubung ke `127.0.0.1:<port>` (hasil tunneling
+  `adb reverse`, lihat [SETUP_ADB.md](SETUP_ADB.md)) memakai satu koneksi
+  TCP dua arah, framing newline-delimited JSON.
+
+`adb reverse`/`adb forward` cuma bisa nge-tunnel TCP, itu sebabnya mode USB
+tidak bisa memakai UDP seperti mode WiFi — ini keterbatasan ADB, bukan
+pilihan desain. `MainActivity` tinggal memilih implementasi mana yang
+diinstansiasi berdasarkan radio button yang dipilih user; keduanya
+mengimplementasikan interface yang sama sehingga sisa kode (UI, counter
+paket, dsb) tidak perlu tahu bedanya.
+
+## Alur rumble (PC → HP)
+
+Ini pelengkap alur input di atas, arahnya kebalikan:
+
+```
+Game mengirim rumble ke virtual controller
+        │
+        ▼
+ViGEmBus -> vgamepad.register_notification() callback terpanggil
+        │  (large_motor, small_motor sebagai byte 0-255)
+        ▼
+GamepadCore._handle_rumble_notification() (server.py)
+        │  dinormalisasi ke 0.0-1.0
+        ▼
+UdpServer/TcpServer mengirim {"type":"rumble", "large":.., "small":..}
+   ke alamat/koneksi HP yang sedang aktif
+        │
+        ▼
+UdpTransport/TcpAdbTransport.onRumbleReceived (Android)
+        │
+        ▼
+MainActivity.applyRumble() -> Vibrator.vibrate(...)
+```
+
+Alasan utama fitur ini ada: motor getar fisik di gamepad (mis. iPega 9076)
+bisa saja rusak/tidak didukung — dengan jalur ini, getaran dari game tetap
+bisa "dirasakan" lewat motor getar HP.
+
+## Crosshair kalibrasi (visual-only, tidak dikirim ke jaringan)
+
+`GyroManager` menyimpan DUA akumulator gyro yang terpisah:
+
+1. `state.gyroYaw` / `state.gyroPitch` — dikirim ke jaringan, direset ke 0
+   oleh transport setiap kali paket terkirim (delta akumulatif per-paket).
+2. `visualYaw` / `visualPitch` — TIDAK pernah dikirim, diklem ke rentang
+   tetap (`visualRange`), dan meluruh balik ke 0 (`decayVisualOffset`) saat
+   gyro tidak aktif — dipakai murni untuk menggerakkan `CrosshairView` di
+   dalam app sebagai alat kalibrasi sensitivitas.
+
+Dipisah sengaja supaya perilaku tampilan (yang butuh "pegas kembali ke
+tengah" biar enak dilihat) tidak mengganggu data yang benar-benar dikirim
+ke controller virtual di PC (yang harus murni representasi delta gerakan,
+tanpa decay buatan).
+
+Penting: crosshair ini muncul di LAYAR HP, di dalam app GyroPad sendiri —
+bukan overlay yang muncul di atas game di layar PC. App Android tidak
+punya akses untuk menggambar di atas tampilan PC; kalau suatu saat ingin
+HUD sungguhan di layar PC, itu perlu komponen terpisah (mis. overlay window
+always-on-top di sisi PC) yang saat ini belum ada di repo ini.
+
 ## Kenapa mengirim snapshot berkala, bukan setiap event?
 
 Event stick/gyro bisa datang puluhan-ratusan kali per detik. Kalau tiap

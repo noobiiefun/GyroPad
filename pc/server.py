@@ -1,30 +1,30 @@
 """
 GyroPad Server
 ==============
-Menerima paket JSON dari aplikasi Android GyroPad lewat UDP, lalu
-mengemulasikan virtual Xbox 360 controller di Windows lewat ViGEmBus
-(via library `vgamepad`).
+Menerima paket JSON dari aplikasi Android GyroPad, mengemulasikan virtual
+Xbox 360 controller di Windows lewat ViGEmBus (via library `vgamepad`), dan
+mengirim BALIK rumble/getaran dari game ke HP - berguna kalau motor getar
+gamepad fisik kamu (mis. iPega 9076) tidak berfungsi.
 
-Cara input digabung:
-- Left stick, right stick, trigger, dan tombol datang langsung dari
-  gamepad fisik (iPega 9076) yang dibaca Android lewat MotionEvent/KeyEvent.
-- Delta gyro (gyaw, gpitch) DITAMBAHKAN ke posisi right stick, hanya saat
-  `gactive` true (mis. saat tombol L1 ditahan di HP). Ini membuat gyro
-  berfungsi sebagai "fine aim" di atas stick kanan biasa - persis seperti
-  gyro-aiming di controller Switch/DS4.
+Dua mode transport:
+- udp  : HP & PC di WiFi yang sama (default)
+- tcp  : HP disambungkan lewat kabel USB, ditunnel `adb reverse` (lihat
+         docs/SETUP_ADB.md). Dipakai kalau WiFi tidak stabil/tidak tersedia.
 
 Requirement:
     pip install -r requirements.txt
     (Windows) install ViGEmBus driver: https://github.com/ViGEm/ViGEmBus/releases
 
 Jalankan:
-    python server.py --port 25565
+    python server.py --mode udp --port 25565
+    python server.py --mode tcp --port 25565   # + jalankan adb reverse dulu
 """
 
 import argparse
 import json
 import socket
 import sys
+import threading
 import time
 
 try:
@@ -57,20 +57,26 @@ def clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
 
-class GyroPadServer:
-    def __init__(self, port: int, gyro_to_stick_scale: float, timeout_s: float):
-        self.port = port
-        # Seberapa besar 1 derajat delta gyro mempengaruhi posisi stick (-1..1).
-        # Nilai kecil = gyro halus/presisi, nilai besar = gyro sensitif/cepat.
+class GamepadCore:
+    """
+    Logika inti yang dipakai bersama oleh mode UDP maupun TCP: terima dict
+    state dari HP, terapkan ke virtual controller, dan expose callback rumble.
+    Supaya kode transport (UDP/TCP) tidak perlu tahu detail vgamepad.
+    """
+
+    def __init__(self, gyro_to_stick_scale: float, on_rumble):
         self.gyro_to_stick_scale = gyro_to_stick_scale
-        self.timeout_s = timeout_s
+        self.on_rumble = on_rumble  # callback(large_float, small_float)
 
         self.gamepad = vg.VX360Gamepad()
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(("0.0.0.0", self.port))
-        self.sock.settimeout(1.0)
+        # register_notification dipanggil ViGEmBus setiap kali game
+        # mengirim rumble ke controller ini (large/small motor bernilai 0-255).
+        self.gamepad.register_notification(self._handle_rumble_notification)
 
-        self.last_packet_time = 0.0
+    def _handle_rumble_notification(self, client, target, large_motor, small_motor, led_number, user_data):
+        large = large_motor / 255.0
+        small = small_motor / 255.0
+        self.on_rumble(large, small)
 
     def apply_state(self, data: dict) -> None:
         lx = clamp(float(data.get("lx", 0.0)), -1.0, 1.0)
@@ -103,8 +109,44 @@ class GyroPadServer:
 
         self.gamepad.update()
 
+    def reset(self) -> None:
+        self.gamepad.reset()
+        self.gamepad.update()
+
+
+def rumble_packet(large: float, small: float) -> bytes:
+    payload = json.dumps({"type": "rumble", "large": large, "small": small})
+    return payload.encode("utf-8")
+
+
+class UdpServer:
+    """Mode WiFi: satu socket UDP dipakai buat terima state & kirim balik rumble."""
+
+    def __init__(self, port: int, gyro_scale: float, timeout_s: float):
+        self.port = port
+        self.timeout_s = timeout_s
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind(("0.0.0.0", self.port))
+        self.sock.settimeout(1.0)
+
+        self.last_addr = None
+        self.last_packet_time = 0.0
+        self.addr_lock = threading.Lock()
+
+        self.core = GamepadCore(gyro_scale, self._on_rumble)
+
+    def _on_rumble(self, large: float, small: float) -> None:
+        with self.addr_lock:
+            addr = self.last_addr
+        if addr is None:
+            return
+        try:
+            self.sock.sendto(rumble_packet(large, small), addr)
+        except OSError:
+            pass
+
     def run(self) -> None:
-        print(f"[GyroPad] Server jalan di UDP port {self.port}")
+        print(f"[GyroPad] Server (UDP/WiFi) jalan di port {self.port}")
         print("[GyroPad] Menunggu koneksi dari HP... (buka app GyroPad & tekan Hubungkan)")
 
         while True:
@@ -119,23 +161,95 @@ class GyroPadServer:
             except (json.JSONDecodeError, UnicodeDecodeError):
                 continue
 
-            if self.last_packet_time == 0.0:
-                print(f"[GyroPad] Terhubung dengan {addr[0]}:{addr[1]}")
-
+            with self.addr_lock:
+                if self.last_addr != addr:
+                    print(f"[GyroPad] Terhubung dengan {addr[0]}:{addr[1]}")
+                self.last_addr = addr
             self.last_packet_time = time.time()
-            self.apply_state(data)
+            self.core.apply_state(data)
 
     def _check_idle(self) -> None:
         if self.last_packet_time and (time.time() - self.last_packet_time) > self.timeout_s:
             print("[GyroPad] Tidak ada paket masuk, mereset controller ke posisi netral.")
-            self.gamepad.reset()
-            self.gamepad.update()
+            self.core.reset()
             self.last_packet_time = 0.0
+            with self.addr_lock:
+                self.last_addr = None
+
+
+class TcpServer:
+    """
+    Mode USB/ADB: HP menyambung ke 127.0.0.1:<port> di sisi HP, yang lewat
+    `adb reverse tcp:<port> tcp:<port>` diteruskan ke port ini di PC.
+    Satu koneksi TCP dipakai dua arah: baca baris JSON (state) dari HP,
+    tulis baris JSON (rumble) balik ke HP saat game mengirim rumble.
+    """
+
+    def __init__(self, port: int, gyro_scale: float):
+        self.port = port
+        self.conn_lock = threading.Lock()
+        self.conn = None
+        self.core = GamepadCore(gyro_scale, self._on_rumble)
+
+    def _on_rumble(self, large: float, small: float) -> None:
+        with self.conn_lock:
+            conn = self.conn
+        if conn is None:
+            return
+        try:
+            conn.sendall(rumble_packet(large, small) + b"\n")
+        except OSError:
+            pass
+
+    def run(self) -> None:
+        server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_sock.bind(("127.0.0.1", self.port))
+        server_sock.listen(1)
+        print(f"[GyroPad] Server (TCP/USB) jalan di port {self.port}")
+        print("[GyroPad] Pastikan sudah jalankan: adb reverse tcp:%d tcp:%d" % (self.port, self.port))
+        print("[GyroPad] Menunggu koneksi dari HP...")
+
+        while True:
+            conn, _ = server_sock.accept()
+            print("[GyroPad] HP terhubung lewat USB.")
+            with self.conn_lock:
+                self.conn = conn
+            self._handle_connection(conn)
+            with self.conn_lock:
+                self.conn = None
+            self.core.reset()
+            print("[GyroPad] Koneksi USB terputus, menunggu koneksi baru...")
+
+    def _handle_connection(self, conn: socket.socket) -> None:
+        buffer = b""
+        conn.settimeout(5.0)
+        while True:
+            try:
+                chunk = conn.recv(4096)
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            if not chunk:
+                break
+            buffer += chunk
+            while b"\n" in buffer:
+                line, buffer = buffer.split(b"\n", 1)
+                if not line.strip():
+                    continue
+                try:
+                    data = json.loads(line.decode("utf-8"))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                self.core.apply_state(data)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="GyroPad PC server")
-    parser.add_argument("--port", type=int, default=25565, help="UDP port (default 25565)")
+    parser.add_argument("--mode", choices=["udp", "tcp"], default="udp",
+                         help="udp = WiFi (default), tcp = USB lewat adb reverse")
+    parser.add_argument("--port", type=int, default=25565, help="Port (default 25565)")
     parser.add_argument(
         "--gyro-scale",
         type=float,
@@ -146,16 +260,15 @@ def main() -> None:
         "--timeout",
         type=float,
         default=2.0,
-        help="Detik idle sebelum controller direset ke netral (default 2.0)",
+        help="[mode udp] Detik idle sebelum controller direset ke netral (default 2.0)",
     )
     args = parser.parse_args()
 
-    server = GyroPadServer(
-        port=args.port,
-        gyro_to_stick_scale=args.gyro_scale,
-        timeout_s=args.timeout,
-    )
     try:
+        if args.mode == "udp":
+            server = UdpServer(port=args.port, gyro_scale=args.gyro_scale, timeout_s=args.timeout)
+        else:
+            server = TcpServer(port=args.port, gyro_scale=args.gyro_scale)
         server.run()
     except KeyboardInterrupt:
         print("\n[GyroPad] Dihentikan oleh user.")

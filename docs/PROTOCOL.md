@@ -1,14 +1,23 @@
 # Protokol Data GyroPad
 
-Versi: `0.1` (baseline, JSON over UDP)
+Versi: `0.2` (JSON, dua arah, UDP atau TCP)
 
 ## Transport
 
-- Protokol: **UDP**
-- Arah: HP (client) → PC (server), satu arah (server tidak membalas paket)
+GyroPad mendukung dua mode transport, tapi FORMAT PAKET-nya sama persis di
+keduanya — cuma cara framing-nya beda:
+
+| Mode | Protokol | Framing | Kapan dipakai |
+|---|---|---|---|
+| WiFi | UDP | satu datagram = satu paket JSON | default, HP & PC satu jaringan |
+| USB/ADB | TCP (via `adb reverse`) | newline-delimited JSON (satu baris = satu paket) | lihat [SETUP_ADB.md](SETUP_ADB.md) |
+
 - Default port: `25565` (bisa diganti, lihat `--port` di `server.py` dan
-  field Port di app Android)
-- Rate kirim default: **120 paket/detik** (`sendRateHz` di `UdpGamepadSender.kt`)
+  field Port di app Android — HARUS sama di kedua sisi)
+- Rate kirim state (HP → PC): **120 paket/detik** mode UDP, **60 paket/detik**
+  mode TCP (`sendRateHz` di `UdpTransport.kt` / `TcpAdbTransport.kt`)
+- Sekarang komunikasi **DUA ARAH**: selain state HP→PC, ada juga paket
+  rumble PC→HP (lihat bagian bawah).
 
 ## Format paket
 
@@ -95,6 +104,35 @@ if gyro_active:
 `gyro_to_stick_scale` diatur lewat argumen `--gyro-scale` saat menjalankan
 `server.py` (default `0.02`). Semakin besar nilainya, semakin sensitif
 gyro-nya.
+
+## Paket rumble (PC → HP)
+
+Arah sebaliknya: saat game mengirim rumble ke virtual controller, server
+meneruskannya ke HP sebagai paket JSON terpisah:
+
+```json
+{
+  "type": "rumble",
+  "large": 0.75,
+  "small": 0.0
+}
+```
+
+| Field   | Tipe    | Rentang     | Keterangan                                         |
+|---------|---------|-------------|---------------------------------------------------|
+| `type`  | string  | `"rumble"`  | Penanda jenis paket (state HP→PC tidak punya field ini) |
+| `large` | float   | 0.0 .. 1.0  | Motor rumble berat/low-frequency (dinormalisasi dari byte 0-255 milik ViGEmBus) |
+| `small` | float   | 0.0 .. 1.0  | Motor rumble ringan/high-frequency                 |
+
+Di sisi Android, dua nilai motor ini digabung jadi satu intensitas (karena
+kebanyakan HP cuma punya satu motor getar) lewat
+`RumbleState.combinedIntensity()`, lalu dipetakan ke amplitude
+`VibrationEffect` (API 26+) atau `vibrate(ms)` biasa di Android lama.
+
+Catatan: mode UDP mengirim balik rumble ke alamat pengirim paket state
+TERAKHIR yang diterima server — jadi pastikan app tetap mengirim state
+secara berkala (sudah otomatis, selama app aktif & terhubung) supaya server
+tahu ke mana harus membalas.
 
 ## Rencana optimasi (belum diimplementasikan)
 

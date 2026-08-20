@@ -48,6 +48,18 @@ class GyroManager(
 
     val isAvailable: Boolean get() = gyroSensor != null
 
+    // --- Visual offset untuk CrosshairView (TIDAK dikirim ke jaringan) ---
+    // Berbeda dari state.gyroYaw/gyroPitch yang direset tiap paket terkirim,
+    // ini akumulasi yang bertahan & diklem ke rentang -1f..1f, dipakai murni
+    // buat ditampilkan sebagai posisi crosshair di dalam app (alat kalibrasi).
+    private var visualYaw = 0f
+    private var visualPitch = 0f
+    private val visualRange = 25f // derajat -> dianggap "mentok" crosshair
+    private val visualDecayPerSecond = 2.2f // kecepatan crosshair balik ke tengah saat gyro nonaktif
+
+    /** Dipanggil tiap frame sensor (aktif maupun tidak) dengan posisi -1f..1f. */
+    var onVisualOffsetChanged: ((x: Float, y: Float) -> Unit)? = null
+
     fun start() {
         gyroSensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
@@ -66,7 +78,6 @@ class GyroManager(
     }
 
     override fun onSensorChanged(event: SensorEvent) {
-        if (!enabled || !state.gyroActive) return
         if (event.sensor.type != Sensor.TYPE_GYROSCOPE) return
 
         if (lastTimestampNs == 0L) {
@@ -76,6 +87,13 @@ class GyroManager(
         val dtSeconds = (event.timestamp - lastTimestampNs) / 1_000_000_000f
         lastTimestampNs = event.timestamp
         if (dtSeconds <= 0f || dtSeconds > 0.5f) return // lewati lompatan waktu aneh
+
+        if (!enabled || !state.gyroActive) {
+            // Gyro nonaktif: hanya luruhkan crosshair kembali ke tengah, tidak
+            // mengubah state jaringan sama sekali.
+            decayVisualOffset(dtSeconds)
+            return
+        }
 
         // event.values dalam rad/s. Pegang HP tegak (portrait) menghadap layar:
         // values[1] = rotasi sumbu Y (mendongak/menunduk -> pitch)
@@ -90,9 +108,29 @@ class GyroManager(
         deltaPitch = deltaPitch.coerceIn(-maxDeltaPerEvent, maxDeltaPerEvent)
 
         // Dikirim sebagai delta akumulatif per-frame kirim; direset oleh
-        // UdpGamepadSender setelah tiap paket terkirim (lihat consumeGyroDelta()).
+        // transport (UdpTransport/TcpAdbTransport) setelah tiap paket terkirim.
         state.gyroYaw += deltaYaw
         state.gyroPitch += deltaPitch
+
+        // Akumulasi terpisah buat crosshair - tidak pernah direset dari luar,
+        // cuma diklem ke rentang visualRange lalu dinormalisasi ke -1f..1f.
+        visualYaw = (visualYaw + deltaYaw).coerceIn(-visualRange, visualRange)
+        visualPitch = (visualPitch + deltaPitch).coerceIn(-visualRange, visualRange)
+        onVisualOffsetChanged?.invoke(visualYaw / visualRange, -visualPitch / visualRange)
+    }
+
+    private fun decayVisualOffset(dtSeconds: Float) {
+        if (visualYaw == 0f && visualPitch == 0f) return
+        val decay = (visualDecayPerSecond * dtSeconds * visualRange)
+        visualYaw = moveTowardZero(visualYaw, decay)
+        visualPitch = moveTowardZero(visualPitch, decay)
+        onVisualOffsetChanged?.invoke(visualYaw / visualRange, -visualPitch / visualRange)
+    }
+
+    private fun moveTowardZero(value: Float, step: Float): Float {
+        if (value > 0f) return max(0f, value - step)
+        if (value < 0f) return min(0f, value + step)
+        return 0f
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {

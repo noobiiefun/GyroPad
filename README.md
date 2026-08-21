@@ -73,6 +73,7 @@ gyropad/
     ├── SETUP_PC.md       # Setup server
     ├── SETUP_ADB.md      # Setup mode USB
     ├── TESTING.md        # Cara uji latency & tombol
+    ├── STEAM.md          # Pakai gyro-aim di Steam (dan game non-Steam)
     └── ROADMAP.md        # Rencana fitur ke depan (detail)
 ```
 
@@ -106,6 +107,14 @@ Detail lengkap paket JSON dua arah (state HP→PC, rumble PC→HP) ada di
 
 Cara menguji latency & mapping tombol GyroPad (baik pakai tool eksternal
 maupun tool bawaan Windows) ada di [docs/TESTING.md](docs/TESTING.md).
+
+## Main lewat Steam
+
+GyroPad bekerja langsung di Steam (dan game non-Steam) tanpa perlu
+konfigurasi Steam Input apapun — controller virtualnya terlihat seperti
+Xbox 360 biasa. Penjelasan lengkap kenapa, dan perbandingannya dengan
+pendekatan "DS4 + Steam Gyro" yang sering muncul di tutorial lain, ada di
+[docs/STEAM.md](docs/STEAM.md).
 
 ## Roadmap / ide pengembangan
 

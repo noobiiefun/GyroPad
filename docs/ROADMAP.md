@@ -126,6 +126,49 @@ sungguhan lewat scope) daripada fitur yang terhubung ke logika game.
     ke PC - `ControllerState` dan protokol jaringan tidak perlu berubah
     sama sekali untuk fitur ini.
 
+## 7. Gyro asli lewat DS4 + Steam Input (dipertimbangkan, belum dikerjakan)
+
+**Konteks:** dibahas saat mengerjakan integrasi Steam - lihat
+[STEAM.md](STEAM.md) untuk perbandingan lengkap. Keputusan saat ini:
+GyroPad tetap emulasi Xbox 360 dengan gyro dicampur ke stick kanan di
+server (sudah jalan, tidak butuh Steam Input apapun), BUKAN emulasi DS4
+dengan gyro asli diteruskan ke Steam.
+
+**Kenapa belum dikerjakan:** `vgamepad` (library yang dipakai server)
+mendukung emulasi DS4, tapi API publiknya tidak mengekspos field
+gyro/accelerometer DS4 ke Python - field itu ada di level driver
+ViGEmBus (`DS4_REPORT_EX.wGyroX/Y/Z`, `wAccelX/Y/Z`), tapi wrapper
+Python-nya tidak meneruskannya. Untuk benar-benar mengirim gyro asli,
+perlu bypass `vgamepad` dan bicara langsung ke DLL `ViGEmClient` lewat
+`ctypes`: bikin struct `DS4_REPORT_EX` manual dengan layout byte yang
+persis sama dengan versi C-nya, lalu panggil
+`vigem_target_ds4_update_ex` langsung.
+
+**Kenapa ini sepadan dipertimbangkan lagi nanti:** pendekatan DS4 asli
+membuka mode "gyro sebagai mouse" di Steam Input (gerakan kamera relatif
+langsung, tanpa lewat kurva respons analog stick) - beberapa orang
+merasa ini lebih presisi buat aiming FPS dibanding simulasi stick yang
+dipakai GyroPad sekarang.
+
+**Risiko/kompleksitas kalau dikerjakan:**
+- Struct `DS4_REPORT_EX` harus di-mirror persis byte-per-byte dari
+  `ViGEmClient/include/ViGEm/Common.h` (C struct) ke `ctypes.Structure`
+  Python - salah alignment/padding sedikit saja bisa bikin data korup
+  tanpa error yang jelas.
+- Harus menjalankan inisialisasi ViGEmBus (`vigem_alloc`, `vigem_connect`,
+  target alloc) sendiri secara paralel dengan yang sudah dilakukan
+  `vgamepad`, atau mengakses instance internal `vgamepad` yang sifatnya
+  private/tidak didokumentasikan (bisa berubah sewaktu-waktu antar versi
+  `vgamepad` tanpa peringatan).
+- Perlu testing ekstra memastikan Steam benar-benar mengenali target
+  sebagai controller ber-gyro (biasanya berdasarkan VID/PID + capability
+  descriptor yang dilaporkan saat enumerasi).
+
+Kalau nanti ada yang mau coba kerjakan ini, mulai dari membaca
+`ViGEmClient/include/ViGEm/Common.h` (struct `DS4_REPORT_EX`) dan
+`ViGEmClient/include/ViGEm/Client.h` (signature `vigem_target_ds4_update_ex`)
+di repo resmi [ViGEmClient](https://github.com/ViGEm/ViGEmClient).
+
 ## Sudah lebih dulu ada di roadmap (dari versi sebelumnya)
 
 - [x] Ganti JSON dengan format biner supaya latency lebih rendah — **selesai di v0.3**, lihat [PROTOCOL.md](PROTOCOL.md)

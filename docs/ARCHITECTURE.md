@@ -40,6 +40,14 @@ ada (termasuk Monster Hunter World/Rise di PC) adalah menambahkan delta
 gyro sebagai pergerakan tambahan di atas right stick — mirip cara kerja
 gyro-aiming di controller Switch/DS4 saat dipetakan ulang ke Xbox layer.
 
+Karena percampuran ini terjadi di server SEBELUM data sampai ke
+Windows/Steam, pendekatan ini otomatis kompatibel dengan Steam (dan game
+non-Steam) TANPA perlu konfigurasi Steam Input sama sekali — berbeda dari
+pendekatan umum "emulasi DS4 + gyro asli lewat tab Gyro Steam Input" yang
+sering dipakai tool lain. Trade-off dan perbandingan lengkapnya ada di
+[STEAM.md](STEAM.md); alasan teknis kenapa jalur DS4 asli belum
+diimplementasikan ada di [ROADMAP.md](ROADMAP.md) bagian 7.
+
 ### Kenapa integrasi angular velocity, bukan `TYPE_ROTATION_VECTOR`?
 `TYPE_ROTATION_VECTOR` memberi orientasi absolut (bagus untuk VR/kompas),
 tapi untuk gyro-aim yang kita mau adalah *kecepatan* gerakan kamera relatif

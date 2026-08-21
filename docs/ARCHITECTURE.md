@@ -247,6 +247,60 @@ mencegah loop tak diinginkan: setiap kali kode MEMANGGIL
 tap dropdown), listener pemilihan profil butuh tahu supaya tidak
 memproses ulang seolah-olah user memilih profil lain.
 
+## Indikator status terpisah: PC↔HP vs Gamepad↔HP (sejak v0.6)
+
+Sebelumnya app cuma punya satu `statusText` umum yang dipakai bergantian
+untuk status koneksi PC dan pesan lain-lain — kalau ada masalah, user
+tidak langsung tahu apakah yang putus itu PC atau gamepad-nya. Sejak v0.6,
+ada dua badge terpisah di bagian atas layar:
+
+1. **Badge "PC"** — mencerminkan `pcConnected` di `MainActivity`, di-set
+   `true` begitu paket state PERTAMA berhasil terkirim lewat
+   [transport] (`onPacketSent`), dan `false` setiap kali transport
+   melempar error (`onError`). Ini terpisah dari `statusText` yang tetap
+   menampilkan pesan detail (IP, pesan error spesifik) — badge ini murni
+   ringkasan ya/tidak, `statusText` tetap ada untuk detailnya.
+2. **Badge "Gamepad"** — dipantau lewat `InputManager.InputDeviceListener`
+   (`onInputDeviceAdded`/`onInputDeviceRemoved`/`onInputDeviceChanged`),
+   mengecek apakah ada device dengan `SOURCE_GAMEPAD` atau
+   `SOURCE_JOYSTICK` yang sedang terpasang — ini mendeteksi iPega
+   ke-disconnect dari Bluetooth SECARA LANGSUNG lewat event sistem, tanpa
+   perlu menunggu user coba gerakkan stick dulu untuk sadar ada masalah.
+
+Catatan implementasi: listener `InputDeviceListener` HANYA menangkap
+*perubahan* (device baru terpasang/lepas setelah listener didaftarkan) —
+device yang sudah terpasang SEBELUM `registerInputDeviceListener()`
+dipanggil tidak memicu callback apapun. Makanya `refreshGamepadStatus()`
+juga dipanggil manual sekali tepat setelah registrasi, untuk melakukan
+scan awal lewat `InputDevice.getDeviceIds()`.
+
+## Popup + bunyi notifikasi saat perangkat tersambung (sejak v0.6)
+
+`pc/notifier.py` menampilkan Windows toast notification + memutar bunyi
+setiap kali ADA KONEKSI BARU terdeteksi (bukan tiap paket) — dipanggil
+dari titik yang sama persis dengan log `"Terhubung dengan ..."`/`"HP
+terhubung lewat USB."` yang sudah ada di `UdpServer`/`TcpServer`.
+
+**Kenapa semua konfigurasi & file suara disimpan di dalam folder `pc/`
+sendiri** (`notify_config.json`, `sounds/connect.wav`), bukan di
+`%APPDATA%` atau registry Windows: supaya kalau folder GyroPad ini
+dihapus/diinstall ulang, semua kustomisasi (bunyi custom, on/off toast)
+otomatis ikut hilang tanpa perlu langkah uninstall terpisah yang
+membersihkan lokasi lain — persis seperti yang diminta ("bisa dicustom
+tetapi tereset saat diuninstall").
+
+**Kenapa semua kegagalan di-diamkan (try/except luas)**: toast library
+(`win10toast`) atau modul `winsound` (Windows-only, bagian dari Python
+stdlib) mungkin tidak tersedia di lingkungan tertentu — notifikasi ini
+pelengkap, jadi kegagalannya TIDAK BOLEH menghentikan server inti
+(gamepad/gyro tetap harus berfungsi walau notifikasi gagal total).
+
+**Kustomisasi:** ganti langsung file `pc/sounds/connect.wav` dengan bunyi
+pilihan sendiri, atau edit `pc/notify_config.json` untuk mematikan
+toast/bunyi secara terpisah (`toast_enabled`/`sound_enabled`), atau
+mematikan semuanya (`enabled: false`). File config ini dibuat otomatis
+dengan nilai default saat pertama kali `server.py` dijalankan.
+
 ## Kenapa mengirim snapshot berkala, bukan setiap event?
 
 Event stick/gyro bisa datang puluhan-ratusan kali per detik. Kalau tiap

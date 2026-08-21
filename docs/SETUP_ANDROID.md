@@ -72,6 +72,27 @@ di [SETUP_ADB.md](SETUP_ADB.md). Setelah `server.py --mode tcp` jalan dan
 otomatis disembunyikan karena selalu `127.0.0.1`), isi Port yang sama, lalu
 **Hubungkan ke PC**.
 
+## Indikator status koneksi
+
+Di bagian atas layar ada dua badge terpisah, berwarna hijau (terhubung)
+atau merah (tidak terhubung):
+
+- **● PC** — mencerminkan koneksi ke server PC (WiFi atau USB, tergantung
+  mode yang dipilih). Jadi hijau begitu paket pertama berhasil terkirim,
+  dan balik merah otomatis kalau ada error jaringan (mis. PC mati,
+  `server.py` berhenti, WiFi terputus).
+- **● Gamepad** — mencerminkan apakah gamepad Bluetooth fisik (iPega 9076)
+  sedang terpasang ke HP, dipantau langsung dari sistem Android (bukan
+  dari lalu-lintas data ke PC). Hijau berarti Android mendeteksi ada
+  device gamepad terhubung; merah berarti tidak ada, walau app-nya sendiri
+  berjalan normal.
+
+Karena dua badge ini independen, kamu bisa langsung tahu bagian mana yang
+bermasalah tanpa harus tebak-tebakan: PC merah + Gamepad hijau berarti
+masalah di jaringan/server; PC hijau + Gamepad merah berarti iPega
+ke-disconnect dari Bluetooth (biasanya gara-gara baterai lemah atau jarak
+terlalu jauh) walau HP-nya tetap terhubung baik ke PC.
+
 ## Kalibrasi gyro
 
 Setiap kali app dibuka, GyroPad otomatis mengkalibrasi gyro selama ~1.5
@@ -152,3 +173,5 @@ bisa menyimpan beberapa preset sensitivitas bernama, tersimpan lokal di HP
 | Kalibrasi terasa tidak akurat / masih drift setelah kalibrasi ulang | Kemungkinan HP masih sedikit bergerak/tergoyang selama proses ~1.5 detik kalibrasi — ulangi dengan HP benar-benar diam di permukaan datar (bukan dipegang tangan) |
 | Sensitivitas balik ke nilai lama setelah pindah profil lalu balik lagi | Ini perilaku normal — tiap profil menyimpan nilainya sendiri-sendiri, geser slider saat profil itu aktif kalau memang mau diubah |
 | Tombol "Hapus" tidak berefek / profil tidak hilang | Tidak bisa menghapus profil terakhir yang tersisa (minimal harus ada satu) — buat profil lain dulu sebelum menghapus yang lama |
+| Badge "Gamepad" merah padahal iPega menyala & sudah di-pairing | Cek statusnya di `Settings > Bluetooth` — harus "Connected", bukan cuma "Paired"; kadang perlu toggle Bluetooth off/on kalau device stuck di "Paired" saja |
+| Badge "PC" tetap merah walau `server.py` sudah jalan | Cek IP/Port sudah benar, satu jaringan WiFi (atau `adb reverse` sudah dijalankan untuk mode USB), dan firewall Windows tidak memblokir |

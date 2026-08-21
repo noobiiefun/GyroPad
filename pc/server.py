@@ -40,6 +40,7 @@ from binary_protocol import (
     decode_state,
     encode_rumble,
 )
+from notifier import notify_connected
 
 try:
     import vgamepad as vg
@@ -173,6 +174,7 @@ class UdpServer:
             with self.addr_lock:
                 if self.last_addr != addr:
                     print(f"[GyroPad] Terhubung dengan {addr[0]}:{addr[1]}")
+                    notify_connected(f"{addr[0]}:{addr[1]} (WiFi)")
                 self.last_addr = addr
             self.last_packet_time = time.time()
             self.core.apply_state(data)
@@ -223,6 +225,7 @@ class TcpServer:
         while True:
             conn, _ = server_sock.accept()
             print("[GyroPad] HP terhubung lewat USB.")
+            notify_connected("USB (ADB)")
             with self.conn_lock:
                 self.conn = conn
             self._handle_connection(conn)

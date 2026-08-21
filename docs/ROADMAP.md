@@ -22,46 +22,28 @@ dan jendelanya harus tetap terbuka selama main.
   harus terlihat walau tidak ada jendela terminal - kemungkinan lewat
   Windows toast notification (lihat poin 2).
 
-## 2. Popup + bunyi notifikasi saat perangkat tersambung
+## 2. Popup + bunyi notifikasi saat perangkat tersambung ✅ selesai (v0.6)
 
-**Yang diinginkan:** saat HP berhasil connect ke PC, muncul popup +
-bunyi, dan pengaturan bunyi ini bisa dikustomisasi user tapi **reset ke
-default saat aplikasi di-uninstall** (bukan tersimpan permanen di sistem).
+**Status:** selesai diimplementasikan. Popup Windows toast (`win10toast`)
++ bunyi (`winsound`, bawaan Python) muncul otomatis setiap ada koneksi HP
+baru — lihat `pc/notifier.py`, dan penjelasan desainnya di bagian "Popup +
+bunyi notifikasi saat perangkat tersambung" di [ARCHITECTURE.md](ARCHITECTURE.md).
+Cara kustomisasi ada di [SETUP_PC.md](SETUP_PC.md).
 
-**Arah pengembangan (sisi PC):**
-- Popup: Windows toast notification (`win10toast` atau `plyer`), muncul
-  singkat di pojok kanan bawah saat `GamepadCore` menerima paket state
-  pertama kali dari HP (event yang sama seperti log
-  `"[GyroPad] Terhubung dengan ..."` yang sudah ada di `server.py`).
-- Bunyi: file `.wav` custom yang bisa diganti user, disimpan di **folder
-  instalasi aplikasi sendiri** (bukan di `%APPDATA%` atau registry global)
-  - supaya kalau aplikasi di-uninstall (folder instalasinya dihapus),
-    setting custom ikut hilang otomatis tanpa perlu uninstaller khusus
-    membersihkan lokasi lain.
-- Pertimbangan: kalau nanti ada instalasi via installer resmi (bukan cuma
-  zip manual), pastikan proses uninstall-nya memang menghapus folder
-  konfigurasi ini juga.
+Yang BELUM dikerjakan dari rencana awal (masih relevan buat nanti):
+- Instalasi via installer resmi (bukan cuma zip manual) - saat ini
+  "uninstall" berarti hapus folder repo secara manual, yang sudah cukup
+  untuk membersihkan config (lihat rasionalnya di dokumen di atas), tapi
+  belum ada installer/uninstaller sungguhan.
 
-## 3. Indikator status koneksi terpisah: PC↔HP vs Gamepad↔HP
+## 3. Indikator status koneksi terpisah: PC↔HP vs Gamepad↔HP ✅ selesai (v0.6)
 
-**Masalah saat ini:** app cuma menunjukkan satu status umum ("Mengirim ke
-..."). Kalau ada masalah, user tidak langsung tahu apakah masalahnya di
-sisi PC (WiFi/USB putus) atau di sisi gamepad (iPega ke-disconnect dari
-Bluetooth HP).
-
-**Arah pengembangan:**
-- Tambah dua indikator terpisah di UI:
-  - **PC ↔ HP**: sudah ada dasarnya lewat `GyroPadTransport` (status
-    dari `onStatusChanged`/`onError`) - tinggal dipisah visualnya dari
-    status gamepad.
-  - **Gamepad ↔ HP**: pantau lewat `InputManager.InputDeviceListener`
-    (`onInputDeviceAdded`/`onInputDeviceRemoved`) untuk mendeteksi kapan
-    device dengan `SOURCE_GAMEPAD`/`SOURCE_JOYSTICK` terpasang/lepas -
-    ini bisa mendeteksi gamepad ke-disconnect dari Bluetooth tanpa perlu
-    nunggu user coba gerakkan stick dulu.
-- Tampilkan sebagai dua badge kecil (mis. lingkaran hijau/merah) dengan
-  label singkat, supaya sekali lihat langsung tahu bagian mana yang
-  bermasalah saat troubleshooting.
+**Status:** selesai diimplementasikan. Dua badge terpisah (PC & Gamepad)
+di bagian atas layar app, persis sesuai rencana - `InputManager.InputDeviceListener`
+dipakai untuk mendeteksi gamepad Bluetooth lepas-sambung tanpa perlu
+menunggu user menggerakkan stick dulu. Detail teknis ada di bagian
+"Indikator status terpisah: PC↔HP vs Gamepad↔HP" di [ARCHITECTURE.md](ARCHITECTURE.md),
+cara bacanya ada di [SETUP_ANDROID.md](SETUP_ANDROID.md).
 
 ## 4. Sistem achievement (lokal saja, buat seru-seruan)
 

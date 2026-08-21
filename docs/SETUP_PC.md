@@ -80,6 +80,41 @@ mendeteksinya sebagai gamepad biasa — tidak perlu konfigurasi tambahan di
 sisi game. Kalau game punya opsi "Controller/Gamepad support", pastikan itu
 aktif.
 
+## Notifikasi popup + bunyi saat HP tersambung
+
+Setiap kali ada HP baru yang berhasil connect, server otomatis
+menampilkan Windows toast notification + memutar bunyi pendek — supaya
+kamu tahu koneksi berhasil tanpa perlu terus-terusan melototin jendela
+terminal.
+
+**Kustomisasi:**
+- **Ganti bunyi**: timpa langsung file `pc/sounds/connect.wav` dengan file
+  `.wav` pilihan kamu sendiri (nama file & lokasi harus tetap sama, atau
+  ubah `sound_path` di config — lihat bawah).
+- **Matikan/nyalakan sebagian**: edit `pc/notify_config.json` (dibuat
+  otomatis dengan nilai default saat `server.py` pertama kali dijalankan):
+  ```json
+  {
+    "enabled": true,
+    "toast_enabled": true,
+    "sound_enabled": true,
+    "sound_path": "sounds/connect.wav"
+  }
+  ```
+  Set `"enabled": false` untuk mematikan semua notifikasi, atau matikan
+  `toast_enabled`/`sound_enabled` secara terpisah.
+
+**Kenapa "tereset saat diuninstall" otomatis kejadian:** file config dan
+suara custom SEMUANYA disimpan di dalam folder `pc/` ini sendiri — bukan
+di `%APPDATA%` atau registry Windows. Jadi kalau kamu hapus/install ulang
+folder GyroPad, kustomisasi ini otomatis ikut hilang tanpa perlu langkah
+uninstall tambahan.
+
+Kalau `win10toast` belum terpasang (`pip install -r requirements.txt`
+belum dijalankan, atau gagal install), popup toast otomatis di-skip
+(tidak melempar error) — bunyi tetap jalan seperti biasa selama modul
+`winsound` bawaan Python tersedia (khas Windows).
+
 ## Troubleshooting
 
 | Masalah | Solusi |
@@ -89,3 +124,5 @@ aktif.
 | Server jalan tapi tidak ada log "Terhubung dengan ..." | HP belum kirim paket — cek [SETUP_ANDROID.md](SETUP_ANDROID.md) bagian "Menghubungkan ke PC", cek firewall |
 | Stick di game "nyangkut" ke satu arah setelah app HP ditutup paksa | Tunggu beberapa detik (default timeout 2 detik), server otomatis reset ke netral. Kalau tidak, restart `server.py` |
 | HP tidak pernah bergetar walau game seharusnya kasih rumble | Tidak semua game mengirim rumble ke controller Xbox (tergantung implementasi game-nya); pastikan juga toggle rumble/vibration aktif di pengaturan game tersebut |
+| Popup toast tidak muncul, tapi bunyi tetap terdengar | Wajar kalau `win10toast` belum terpasang atau gagal — cek `pip install win10toast` terpisah kalau memang ingin popup-nya, bunyi tetap berfungsi independen |
+| Tidak ada popup MAUPUN bunyi sama sekali | Cek `pc/notify_config.json` — pastikan `"enabled": true`; kalau file itu tidak ada sama sekali, jalankan `server.py` sekali dulu supaya dibuatkan otomatis |

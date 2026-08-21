@@ -85,6 +85,8 @@ gyropad/
 - **Rumble feedback dari game ke HP** — pengganti motor getar gamepad yang rusak/tidak ada
 - Crosshair kalibrasi di dalam app buat merasakan sensitivitas gyro sebelum masuk game
 - Profil sensitivitas per-game (buat, pilih, hapus lewat dropdown + tombol "+"), tersimpan lokal di HP
+- Indikator status koneksi terpisah (PC↔HP dan Gamepad↔HP) buat troubleshooting cepat
+- Popup + bunyi notifikasi di PC saat HP tersambung (bisa dikustomisasi)
 
 ## Quick start
 

@@ -1,10 +1,13 @@
 package com.gyropad.app
 
+import android.graphics.Color
+import android.hardware.input.InputManager
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.widget.AdapterView
@@ -46,6 +49,11 @@ import com.gyropad.app.ui.CrosshairView
  *    di dalam app (bukan overlay di atas game).
  *  - [ProfileStore] menyimpan beberapa preset sensitivitas gyro (biasanya
  *    satu per game) secara lokal, dipilih lewat dropdown profil.
+ *  - Dua indikator status TERPISAH ditampilkan: "PC" (status [transport],
+ *    berdasarkan paket yang berhasil terkirim/error) dan "Gamepad" (status
+ *    device Bluetooth fisik, dipantau lewat [InputManager.InputDeviceListener]).
+ *    Keduanya sengaja dipisah supaya saat ada masalah, jelas bagian mana yang
+ *    putus - PC atau gamepad-nya - tanpa perlu menebak dari satu status umum.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -68,6 +76,17 @@ class MainActivity : AppCompatActivity() {
 
     private var packetsSent = 0
     private var usbModeSelected = false
+
+    // --- Indikator status terpisah: PC<->HP vs Gamepad<->HP ---
+    private lateinit var pcStatusBadge: TextView
+    private lateinit var gamepadStatusBadge: TextView
+    private var pcConnected = false
+    private val inputManager by lazy { getSystemService(INPUT_SERVICE) as InputManager }
+    private val inputDeviceListener = object : InputManager.InputDeviceListener {
+        override fun onInputDeviceAdded(deviceId: Int) = refreshGamepadStatus()
+        override fun onInputDeviceRemoved(deviceId: Int) = refreshGamepadStatus()
+        override fun onInputDeviceChanged(deviceId: Int) = refreshGamepadStatus()
+    }
 
     // --- Profil sensitivitas ---
     private lateinit var profileStore: ProfileStore
@@ -106,6 +125,8 @@ class MainActivity : AppCompatActivity() {
         packetCountText = findViewById(R.id.textPacketCount)
         rumbleStatusText = findViewById(R.id.textRumbleStatus)
         crosshairView = findViewById(R.id.crosshairView)
+        pcStatusBadge = findViewById(R.id.textPcStatusBadge)
+        gamepadStatusBadge = findViewById(R.id.textGamepadStatusBadge)
 
         radioGroupMode.setOnCheckedChangeListener { _, checkedId ->
             usbModeSelected = checkedId == R.id.radioUsb
@@ -116,6 +137,7 @@ class MainActivity : AppCompatActivity() {
 
         connectButton.setOnClickListener {
             transport?.stop()
+            setPcConnected(false)
             val port = portInput.text.toString().toIntOrNull() ?: 25565
 
             transport = if (usbModeSelected) {
@@ -129,10 +151,12 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread { statusText.text = msg }
             }
             transport?.onError = { e ->
+                setPcConnected(false)
                 runOnUiThread { statusText.text = "Error: ${e.message}" }
             }
             transport?.onPacketSent = {
                 packetsSent++
+                if (!pcConnected) setPcConnected(true)
                 if (packetsSent % 60 == 0) {
                     runOnUiThread { packetCountText.text = "Paket terkirim: $packetsSent" }
                 }
@@ -193,6 +217,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         gyroManager.start()
+
+        inputManager.registerInputDeviceListener(inputDeviceListener, null)
+        refreshGamepadStatus() // scan device yang sudah terpasang SEBELUM app dibuka -
+                                // listener di atas cuma menangkap perubahan SETELAH ini
     }
 
     override fun onDestroy() {
@@ -200,6 +228,7 @@ class MainActivity : AppCompatActivity() {
         gyroManager.stop()
         transport?.stop()
         vibrator?.cancel()
+        inputManager.unregisterInputDeviceListener(inputDeviceListener)
     }
 
     // Ditangkap di level Activity supaya event dari gamepad fisik (iPega 9076)
@@ -378,5 +407,49 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Batal", null)
             .show()
+    }
+
+    // ------------------------------------------------------------------
+    // Indikator status terpisah: PC<->HP vs Gamepad<->HP
+    // ------------------------------------------------------------------
+
+    /**
+     * Dipanggil setiap ada sinyal konektivitas PC berubah - paket berhasil
+     * terkirim pertama kali (jadi true) atau transport melempar error
+     * (jadi false). Terpisah dari [statusText] yang menampilkan pesan detail
+     * (mis. alamat IP, pesan error) - badge ini murni ringkasan ya/tidak.
+     */
+    private fun setPcConnected(connected: Boolean) {
+        if (pcConnected == connected) return
+        pcConnected = connected
+        runOnUiThread {
+            pcStatusBadge.text = if (connected) "● PC: Terhubung" else "● PC: Tidak terhubung"
+            pcStatusBadge.setTextColor(if (connected) COLOR_CONNECTED else COLOR_DISCONNECTED)
+        }
+    }
+
+    /**
+     * Cek apakah ada device dengan sumber SOURCE_GAMEPAD/SOURCE_JOYSTICK
+     * yang sedang terpasang (mis. iPega 9076 yang sudah dipasangkan lewat
+     * Bluetooth). Dipanggil sekali saat app dibuka (buat device yang SUDAH
+     * terpasang sebelum listener dipasang), dan setiap kali
+     * [InputManager.InputDeviceListener] melaporkan perubahan.
+     */
+    private fun refreshGamepadStatus() {
+        val connected = InputDevice.getDeviceIds().any { id ->
+            val device = InputDevice.getDevice(id) ?: return@any false
+            val sources = device.sources
+            (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+                (sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+        }
+        runOnUiThread {
+            gamepadStatusBadge.text = if (connected) "● Gamepad: Terhubung" else "● Gamepad: Tidak terhubung"
+            gamepadStatusBadge.setTextColor(if (connected) COLOR_CONNECTED else COLOR_DISCONNECTED)
+        }
+    }
+
+    companion object {
+        private val COLOR_CONNECTED = Color.parseColor("#2E7D32")
+        private val COLOR_DISCONNECTED = Color.parseColor("#C62828")
     }
 }

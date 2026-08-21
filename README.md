@@ -83,7 +83,7 @@ gyropad/
 - Gyro-aim pakai sensor gyroscope HP, hold-to-aim lewat tombol L1, dengan kalibrasi bias otomatis + auto-koreksi drift saat HP diam
 - Dua mode koneksi ke PC: **WiFi (UDP)** atau **USB via ADB (TCP)**, protokol biner (bukan JSON) buat latency rendah
 - **Rumble feedback dari game ke HP** — pengganti motor getar gamepad yang rusak/tidak ada
-- Crosshair kalibrasi di dalam app buat merasakan sensitivitas gyro sebelum masuk game
+- Crosshair kalibrasi di dalam app buat merasakan sensitivitas gyro sebelum masuk game, dengan 6 tema visual yang bisa diganti (Klasik, Scope Presisi ala Monster Hunter, Bracket Taktis, dan lainnya)
 - Profil sensitivitas per-game (buat, pilih, hapus lewat dropdown + tombol "+"), tersimpan lokal di HP
 - Indikator status koneksi terpisah (PC↔HP dan Gamepad↔HP) buat troubleshooting cepat
 - Popup + bunyi notifikasi di PC saat HP tersambung (bisa dikustomisasi)

@@ -209,6 +209,37 @@ punya akses untuk menggambar di atas tampilan PC; kalau suatu saat ingin
 HUD sungguhan di layar PC, itu perlu komponen terpisah (mis. overlay window
 always-on-top di sisi PC) yang saat ini belum ada di repo ini.
 
+### Tema/gaya crosshair (sejak v0.7)
+
+`CrosshairView` bisa menggambar beberapa gaya visual berbeda, dipilih
+lewat `enum class CrosshairStyle` — semua gaya memakai titik `(px, py)`
+yang sama persis (posisi hasil offset gyro saat ini dari GyroManager),
+cuma beda cara menggambarnya. Ini penting: **mengganti tema TIDAK
+memengaruhi logika gerakan gyro sama sekali**, murni tampilan/kosmetik —
+`onDraw()` cuma memilih fungsi gambar yang berbeda berdasarkan `style`
+yang aktif, semuanya menerima titik target yang sama.
+
+Gaya yang tersedia (lihat `CrosshairView.kt` untuk detail masing-masing
+fungsi gambar):
+- **Klasik** — gaya asli GyroPad (cross + lingkaran kecil)
+- **Scope Presisi** — garis horizontal/vertikal penuh + cincin graduasi,
+  diadaptasi dari tampilan HUD bidikan game seperti Monster Hunter
+- **Bracket Taktis** — empat sudut bracket, gaya "target lock" kamera
+- **Cincin Putus-putus** — lingkaran dengan `DashPathEffect`
+- **Chevron Berlian** — dua chevron atas-bawah + belah ketupat tengah
+- **Heksagon** — dua heksagon dekoratif di kiri-kanan titik bidik
+
+Pilihan tema disimpan lokal lewat `CrosshairPrefs` (satu key
+`SharedPreferences`, tidak perlu JSON seperti `ProfileStore` karena cuma
+satu nilai) — jadi tema yang dipilih bertahan setelah app ditutup dan
+dibuka lagi.
+
+**Menambah gaya baru:** tambahkan satu entri di `enum class
+CrosshairStyle` (otomatis muncul di dropdown karena diisi dari
+`CrosshairStyle.values()`), lalu tambahkan satu `when` branch di
+`onDraw()` yang memanggil fungsi gambar baru — tidak perlu menyentuh kode
+di `MainActivity.kt` maupun `GyroManager.kt` sama sekali.
+
 ## Profil sensitivitas per-game (sejak v0.5)
 
 Sensitivitas gyro yang pas buat satu game belum tentu pas buat game lain

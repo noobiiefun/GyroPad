@@ -153,6 +153,11 @@ bisa menyimpan beberapa preset sensitivitas bernama, tersimpan lokal di HP
   bantu buat merasakan/mengatur sensitivitas SEBELUM masuk game. Panel ini
   ada di dalam app HP, bukan overlay di atas layar game (app HP memang
   tidak bisa menggambar di atas layar PC).
+- Dropdown tepat di atas panel crosshair biar bisa ganti **tema/gaya
+  visual**-nya: Klasik, Scope Presisi (ala Monster Hunter), Bracket
+  Taktis, Cincin Putus-putus, Chevron Berlian, atau Heksagon — murni
+  kosmetik, tidak memengaruhi cara gyro-aim bekerja sama sekali. Pilihan
+  tema tersimpan otomatis, tetap sama saat app dibuka lagi nanti.
 - Teks **"Rumble dari game"** menunjukkan status getaran yang diterima
   balik dari PC. Ini menggantikan motor getar gamepad fisik yang tidak
   berfungsi — HP akan bergetar setiap kali game mengirim rumble ke virtual

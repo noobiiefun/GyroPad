@@ -32,6 +32,8 @@ import com.gyropad.app.net.TcpAdbTransport
 import com.gyropad.app.net.UdpTransport
 import com.gyropad.app.profile.ProfileStore
 import com.gyropad.app.profile.SensitivityProfile
+import com.gyropad.app.ui.CrosshairPrefs
+import com.gyropad.app.ui.CrosshairStyle
 import com.gyropad.app.ui.CrosshairView
 
 /**
@@ -125,8 +127,11 @@ class MainActivity : AppCompatActivity() {
         packetCountText = findViewById(R.id.textPacketCount)
         rumbleStatusText = findViewById(R.id.textRumbleStatus)
         crosshairView = findViewById(R.id.crosshairView)
+        val spinnerCrosshairStyle = findViewById<Spinner>(R.id.spinnerCrosshairStyle)
         pcStatusBadge = findViewById(R.id.textPcStatusBadge)
         gamepadStatusBadge = findViewById(R.id.textGamepadStatusBadge)
+
+        setupCrosshairStyleUi(spinnerCrosshairStyle)
 
         radioGroupMode.setOnCheckedChangeListener { _, checkedId ->
             usbModeSelected = checkedId == R.id.radioUsb
@@ -445,6 +450,40 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             gamepadStatusBadge.text = if (connected) "● Gamepad: Terhubung" else "● Gamepad: Tidak terhubung"
             gamepadStatusBadge.setTextColor(if (connected) COLOR_CONNECTED else COLOR_DISCONNECTED)
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Tema/gaya crosshair
+    // ------------------------------------------------------------------
+
+    /**
+     * Isi dropdown tema dari semua nilai [CrosshairStyle], muat pilihan
+     * terakhir dari [CrosshairPrefs], dan simpan lagi setiap kali user
+     * pilih tema lain - jadi tema yang dipilih bertahan walau app ditutup.
+     */
+    private fun setupCrosshairStyleUi(spinner: Spinner) {
+        val styles = CrosshairStyle.values()
+        val adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            styles.map { it.displayName }
+        )
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinner.adapter = adapter
+
+        val savedStyle = CrosshairPrefs.loadStyle(this)
+        val initialIndex = styles.indexOf(savedStyle).coerceAtLeast(0)
+        spinner.setSelection(initialIndex)
+        crosshairView.style = styles[initialIndex]
+
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                val selected = styles.getOrNull(position) ?: return
+                crosshairView.style = selected
+                CrosshairPrefs.saveStyle(this@MainActivity, selected)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
     }
 

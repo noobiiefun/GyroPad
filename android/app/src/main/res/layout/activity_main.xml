@@ -232,6 +232,12 @@
         android:layout_marginTop="16dp"
         android:text="Preview arah gyro (kalibrasi, bukan tampilan in-game)" />
 
+    <Spinner
+        android:id="@+id/spinnerCrosshairStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" />
+
     <com.gyropad.app.ui.CrosshairView
         android:id="@+id/crosshairView"
         android:layout_width="match_parent"
